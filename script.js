@@ -5,7 +5,9 @@
 // =====================================
 
 // 1. NASA API KEY
-const NASA_API_KEY = "6jBwTPHfdHjMMnLBQdNbcWgn78QQpqN87hNcPmQp";
+// Replace DEMO_KEY with your key from https://api.nasa.gov/ when available.
+const NASA_API_KEY = "DEMO_KEY";
+
 // 2. SELECT HTML ELEMENTS
 const gallery = document.getElementById("galleryContainer");
 const loadingMessage = document.getElementById("loadingMessage");
@@ -42,11 +44,13 @@ async function getSpaceDiscoveries(startDate, endDate) {
 
   try {
 
-    // API URL
-    const apiURL =
-      `https://science.nasa.gov/wp-json/wp/v2/apod-basic/` +
-      `?start_date=${startDate}&end_date=${endDate}` +
-      `&api_key=${NASA_API_KEY}`;
+    // NASA Astronomy Picture of the Day API URL
+    const apiURL = new URL("https://api.nasa.gov/planetary/apod");
+    apiURL.search = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+      api_key: NASA_API_KEY,
+    });
 
     // FETCH DATA FROM NASA
     const response = await fetch(apiURL);
@@ -201,9 +205,11 @@ randomButton.addEventListener("click", async function() {
 
   try {
 
-    const apiURL =
-      `https://science.nasa.gov/wp-json/wp/v2/apod-basic/` +
-      `?count=9&api_key=${NASA_API_KEY}`;
+    const apiURL = new URL("https://api.nasa.gov/planetary/apod");
+    apiURL.search = new URLSearchParams({
+      count: "9",
+      api_key: NASA_API_KEY,
+    });
 
     const response = await fetch(apiURL);
 
