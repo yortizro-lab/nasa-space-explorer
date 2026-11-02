@@ -244,3 +244,20 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+header {
+    background:
+        linear-gradient(
+            rgba(0, 0, 20, 0.35),
+            rgba(0, 0, 20, 0.55)
+        ),
+        url("galaxy.jpg");
+
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    color: white;
+    text-align: center;
+    padding: 70px 20px;
+    border-radius: 0 0 20px 20px;
+}
