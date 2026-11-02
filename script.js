@@ -5,8 +5,7 @@
 // =====================================
 
 // 1. NASA API KEY
-const NASA_API_KEY = "YOUR_NEW_NASA_API_KEY";
-
+const NASA_API_KEY = "6jBwTPHfdHjMMnLBQdNbcWgn78QQpqN87hNcPmQp";
 // 2. SELECT HTML ELEMENTS
 const gallery = document.getElementById("galleryContainer");
 const loadingMessage = document.getElementById("loadingMessage");
