@@ -6,8 +6,7 @@
 
 // 1. NASA API KEY
 // Replace DEMO_KEY with your key from https://api.nasa.gov/ when available.
-const NASA_API_KEY = "DEMO_KEY";
-
+const NASA_API_KEY = "ppD6BTBqdDrpjrzrdJdDmJFJF77GcLqRLtmkddTh";
 // 2. SELECT HTML ELEMENTS
 const gallery = document.getElementById("galleryContainer");
 const loadingMessage = document.getElementById("loadingMessage");
