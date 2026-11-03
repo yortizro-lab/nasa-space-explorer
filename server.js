@@ -4,15 +4,22 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-if (fs.existsSync(".env")) {
-  for (const line of fs.readFileSync(".env", "utf8").split(/\r?\n/)) {
+const ENV_FILE = path.join(__dirname, ".env");
+if (fs.existsSync(ENV_FILE)) {
+  for (const line of fs.readFileSync(ENV_FILE, "utf8").split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/);
-    if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    if (m && !(m[1] in process.env)) {
+      process.env[m[1]] = m[2].replace(/^["']|["']$/g, "").trim();
+    }
   }
 }
 
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.NASA_API_KEY || "DEMO_KEY";
+const API_KEY = (process.env.NASA_API_KEY || "").trim();
+if (!API_KEY) {
+  console.error("Missing NASA_API_KEY. Add it to the project-root .env file.");
+  process.exit(1);
+}
 const ROOT = __dirname;
 const ALLOWED = ["date", "start_date", "end_date", "count", "thumbs"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
