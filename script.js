@@ -222,6 +222,10 @@ function displayDiscoveries() {
     const cardInfo = document.createElement("div");
     cardInfo.className = "card-info";
 
+    const source = document.createElement("span");
+    source.className = "card-source";
+    source.textContent = "NASA";
+
     const title = document.createElement("h3");
     title.textContent = discovery.title;
 
@@ -233,7 +237,11 @@ function displayDiscoveries() {
       ? discovery.explanation.substring(0, 110) + "..."
       : "Discover this amazing space image.";
 
-    cardInfo.append(title, date, description);
+    const action = document.createElement("span");
+    action.className = "card-action";
+    action.textContent = "Click to read the explanation";
+
+    cardInfo.append(source, title, date, description, action);
     card.append(createMedia(discovery, false), cardInfo);
 
     card.addEventListener("click", function (event) {
@@ -273,7 +281,8 @@ function openImageModal(discovery) {
   modalImage.alt = discovery.title;
   modalTitle.textContent = discovery.title;
   modalDate.textContent = `Date: ${discovery.date}`;
-  modalExplanation.textContent = discovery.explanation || "";
+  modalExplanation.textContent = discovery.explanation
+    || "NASA hasn't provided an explanation for this discovery.";
   modalLink.href = `https://apod.nasa.gov/apod/ap${discovery.date.slice(2).replace(/-/g, "")}.html`;
 
   imageModal.style.display = "block";
