@@ -47,6 +47,8 @@
 
       <p id="errorMessage" class="error"></p>
 
+      <article id="featured" class="featured" hidden></article>
+
       <div class="gallery" id="galleryContainer"></div>
     </section>
   </main>
@@ -55,11 +57,12 @@
     <div class="modal-content">
       <button class="close-button" id="closeModal">&times;</button>
       <img id="modalImage" src="" alt="NASA space discovery">
+      <iframe id="modalVideo" title="NASA video" allowfullscreen hidden></iframe>
       <h2 id="modalTitle"></h2>
       <p id="modalDate"></p>
       <p id="modalExplanation"></p>
       <a id="modalLink" href="#" target="_blank" rel="noopener">
-        View Original NASA Image
+        View Original on NASA
       </a>
     </div>
   </div>

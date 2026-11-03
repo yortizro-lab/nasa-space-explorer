@@ -46,8 +46,9 @@ nav a:hover {
   padding: 100px 20px;
   text-align: center;
   background:
-    radial-gradient(circle at 50% 30%, #243c75, transparent 45%),
-    linear-gradient(135deg, #101b3b, #050817);
+    radial-gradient(circle at 50% 30%, rgba(36, 60, 117, 0.75), transparent 55%),
+    linear-gradient(135deg, rgba(16, 27, 59, 0.55), rgba(5, 8, 23, 0.7)),
+    url("imagenes/galaxy.jpg") center / cover no-repeat;
 }
 
 .subtitle {
@@ -158,6 +159,70 @@ nav a:hover {
   font-size: 14px;
 }
 
+.featured {
+  max-width: 900px;
+  margin: 30px auto 0;
+  background: #111a32;
+  border: 1px solid #27395f;
+  border-radius: 15px;
+  overflow: hidden;
+  text-align: left;
+}
+
+.featured[hidden],
+.modal-content [hidden] {
+  display: none;
+}
+
+.featured img,
+.featured iframe {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  background: #000;
+}
+
+.featured iframe,
+.modal-content iframe {
+  aspect-ratio: 16 / 9;
+  border: 0;
+}
+
+.modal-content iframe {
+  width: 100%;
+  margin: 15px 0;
+}
+
+.featured-info {
+  padding: 20px;
+}
+
+.featured-info h3 {
+  color: #65c9ff;
+  font-size: 24px;
+}
+
+.featured-info p {
+  color: #aebbd3;
+  margin-top: 10px;
+}
+
+.featured-info a,
+.video-placeholder a {
+  color: #65c9ff;
+}
+
+.video-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 210px;
+  background: #0b1025;
+  text-align: center;
+  padding: 10px;
+}
+
 .message {
   margin: 20px;
   color: #65c9ff;
@@ -243,21 +308,4 @@ footer {
   .gallery {
     grid-template-columns: 1fr;
   }
-}
-header {
-    background:
-        linear-gradient(
-            rgba(0, 0, 20, 0.35),
-            rgba(0, 0, 20, 0.55)
-        ),
-        url("galaxy.jpg");
-
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-
-    color: white;
-    text-align: center;
-    padding: 70px 20px;
-    border-radius: 0 0 20px 20px;
 }

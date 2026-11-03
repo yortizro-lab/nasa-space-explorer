@@ -1,14 +1,16 @@
-
 // =====================================
 // NASA SPACE EXPLORER
-// API, ARRAYS, LOOPS AND JSON
+// Requests go to our own server (/api/apod), which adds the private
+// NASA API key. No key is stored in this public file.
 // =====================================
 
-// 1. NASA API KEY
-// Replace DEMO_KEY with your key from https://api.nasa.gov/ when available.
-const NASA_API_KEY = "ppD6BTBqdDrpjrzrdJdDmJFJF77GcLqRLtmkddTh";
-// 2. SELECT HTML ELEMENTS
+const APOD_ENDPOINT = "/api/apod";
+const APOD_FIRST_DATE = "1995-06-16";
+const DAY_MS = 86400000;
+
+// 1. SELECT HTML ELEMENTS
 const gallery = document.getElementById("galleryContainer");
+const featured = document.getElementById("featured");
 const loadingMessage = document.getElementById("loadingMessage");
 const errorMessage = document.getElementById("errorMessage");
 
@@ -18,104 +20,204 @@ const randomButton = document.getElementById("randomButton");
 
 const imageModal = document.getElementById("imageModal");
 const modalImage = document.getElementById("modalImage");
+const modalVideo = document.getElementById("modalVideo");
 const modalTitle = document.getElementById("modalTitle");
 const modalDate = document.getElementById("modalDate");
 const modalExplanation = document.getElementById("modalExplanation");
 const modalLink = document.getElementById("modalLink");
 const closeModal = document.getElementById("closeModal");
 
-// 3. ARRAY TO STORE NASA DISCOVERIES
 let spaceDiscoveries = [];
+let latestRequestId = 0;
 
-// 4. SET TODAY'S DATE
-const today = new Date();
-const todayString = today.toISOString().split("T")[0];
+// 2. DATE HELPERS (calendar dates as YYYY-MM-DD, handled in UTC to avoid shifts)
+function toDateString(ms) {
+  return new Date(ms).toISOString().split("T")[0];
+}
 
+function toMs(dateString) {
+  return Date.parse(dateString + "T00:00:00Z");
+}
+
+// Today's calendar date in the user's timezone
+const now = new Date();
+const todayString = toDateString(
+  Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+);
+
+startDateInput.min = APOD_FIRST_DATE;
 startDateInput.max = todayString;
 startDateInput.value = todayString;
 
-// 5. NASA API FUNCTION
-async function getSpaceDiscoveries(startDate, endDate) {
+// 3. NASA API HELPER
+async function fetchApod(params) {
+  const response = await fetch(`${APOD_ENDPOINT}?${new URLSearchParams(params)}`);
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("NASA returned an unreadable response.");
+  }
+  if (!response.ok) {
+    const message = (data && (data.msg || data.error?.message || data.error)) || "";
+    const error = new Error(message || `NASA API error (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
+  return Array.isArray(data) ? data : [data];
+}
 
-  loadingMessage.textContent = "🌌 Exploring the universe...";
+// 4. LOAD DISCOVERIES: 9 entries starting at startDate.
+// The entry whose date equals `focusDate` is shown in the featured panel.
+async function loadDiscoveries(startDate, focusDate, loadingText) {
+  const requestId = ++latestRequestId;
+
+  loadingMessage.textContent = loadingText || "🌌 Exploring the universe...";
   errorMessage.textContent = "";
   gallery.innerHTML = "";
+  featured.hidden = true;
+
+  const endMs = Math.min(toMs(startDate) + 8 * DAY_MS, toMs(todayString));
+  let endDate = toDateString(endMs);
 
   try {
-
-    // NASA Astronomy Picture of the Day API URL
-    const apiURL = new URL("https://api.nasa.gov/planetary/apod");
-    apiURL.search = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate,
-      api_key: NASA_API_KEY,
-    });
-
-    // FETCH DATA FROM NASA
-    const response = await fetch(apiURL);
-
-    if (!response.ok) {
-      throw new Error("NASA API request failed.");
+    let results;
+    try {
+      results = await fetchApod({ start_date: startDate, end_date: endDate, thumbs: "true" });
+    } catch (error) {
+      // Today's picture may not be published yet (NASA publishes in US time)
+      if (endDate !== todayString || error.status !== 400) throw error;
+      endDate = toDateString(endMs - DAY_MS);
+      results = await fetchApod({ start_date: startDate, end_date: endDate, thumbs: "true" });
     }
 
-    // CONVERT RESPONSE INTO JSON
-    const jsonData = await response.json();
+    if (requestId !== latestRequestId) return;
 
-    // STORE DATA IN AN ARRAY
-    spaceDiscoveries = Array.isArray(jsonData)
-      ? jsonData
-      : [jsonData];
+    // JSON -> sorted array, newest/oldest consistent by date
+    spaceDiscoveries = results.sort((a, b) => a.date.localeCompare(b.date));
 
-    // SORT DISCOVERIES BY DATE
-    spaceDiscoveries.sort((a, b) =>
-      a.date.localeCompare(b.date)
-    );
+    const focus =
+      spaceDiscoveries.find((d) => d.date === focusDate) ||
+      spaceDiscoveries[spaceDiscoveries.length - 1];
 
-    // DISPLAY DISCOVERIES USING A LOOP
+    if (!focus) {
+      loadingMessage.textContent = "No discoveries found for this selection.";
+      return;
+    }
+
+    displayFeatured(focus);
     displayDiscoveries();
-
+    loadingMessage.textContent = `✨ Found ${spaceDiscoveries.length} discoveries!`;
   } catch (error) {
-
     console.error("NASA API Error:", error);
-
+    if (requestId !== latestRequestId) return;
     errorMessage.textContent =
-      "Unable to load NASA discoveries. Please try again.";
-
+      `Unable to load NASA discoveries. ${error.message || "Please try again."}`;
     loadingMessage.textContent = "";
-
   }
 }
 
-// 6. DISPLAY NASA IMAGES USING A FOR LOOP
-function displayDiscoveries() {
+// 5. MEDIA HELPERS
+function isHttps(url) {
+  try {
+    return new URL(url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
-  gallery.innerHTML = "";
+function createMissingMedia(discovery) {
+  const box = document.createElement("div");
+  box.className = "video-placeholder";
+  const link = document.createElement("a");
+  link.href = discovery.url && isHttps(discovery.url) ? discovery.url : "https://apod.nasa.gov/apod/";
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = discovery.media_type === "video"
+    ? "▶ Watch this NASA video"
+    : "Image unavailable – view on NASA";
+  box.appendChild(link);
+  return box;
+}
 
-  if (spaceDiscoveries.length === 0) {
-    loadingMessage.textContent = "No discoveries found.";
-    return;
+// Image element for a discovery; falls back to a link if loading fails
+function createMedia(discovery, useHd) {
+  if (discovery.media_type === "video") {
+    if (discovery.thumbnail_url && isHttps(discovery.thumbnail_url)) {
+      const thumb = document.createElement("img");
+      thumb.src = discovery.thumbnail_url;
+      thumb.alt = `Video thumbnail: ${discovery.title}`;
+      thumb.loading = "lazy";
+      return thumb;
+    }
+    return createMissingMedia(discovery);
   }
 
-  loadingMessage.textContent =
-    `✨ Found ${spaceDiscoveries.length} space discoveries!`;
+  const source = (useHd && discovery.hdurl) || discovery.url;
+  if (!source || !isHttps(source)) return createMissingMedia(discovery);
+
+  const image = document.createElement("img");
+  image.src = source;
+  image.alt = discovery.title;
+  image.loading = "lazy";
+  image.addEventListener("error", function () {
+    if (useHd && discovery.hdurl && image.src !== discovery.url && discovery.url) {
+      image.src = discovery.url;
+      return;
+    }
+    image.replaceWith(createMissingMedia(discovery));
+  });
+  return image;
+}
+
+// 6. FEATURED DISCOVERY (today / selected / random date)
+function displayFeatured(discovery) {
+  featured.innerHTML = "";
+
+  let media;
+  if (discovery.media_type === "video" && isHttps(discovery.url) && /youtube|vimeo|youtu\.be/.test(discovery.url)) {
+    media = document.createElement("iframe");
+    media.src = discovery.url;
+    media.title = discovery.title;
+    media.allowFullscreen = true;
+  } else {
+    media = createMedia(discovery, true);
+  }
+
+  const info = document.createElement("div");
+  info.className = "featured-info";
+
+  const title = document.createElement("h3");
+  title.textContent = discovery.title;
+
+  const date = document.createElement("p");
+  date.textContent = `📅 ${discovery.date}`;
+
+  const text = document.createElement("p");
+  text.textContent = discovery.explanation || "No explanation provided by NASA.";
+
+  const credit = document.createElement("p");
+  if (discovery.copyright) credit.textContent = `© ${discovery.copyright.trim()}`;
+
+  info.append(title, date, text);
+  if (discovery.copyright) info.appendChild(credit);
+
+  featured.append(media, info);
+  featured.hidden = false;
+}
+
+// 7. GALLERY CARDS
+function displayDiscoveries() {
+  gallery.innerHTML = "";
 
   for (let i = 0; i < spaceDiscoveries.length; i++) {
-
     const discovery = spaceDiscoveries[i];
 
-    // Skip videos and entries without images
-    if (discovery.media_type !== "image" || !discovery.url) {
-      continue;
-    }
-
-    // CREATE IMAGE CARD
     const card = document.createElement("div");
     card.className = "space-card";
-
-    const image = document.createElement("img");
-    image.src = discovery.url;
-    image.alt = discovery.alt || discovery.title;
-    image.loading = "lazy";
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `View ${discovery.title}`);
 
     const cardInfo = document.createElement("div");
     cardInfo.className = "card-info";
@@ -124,118 +226,99 @@ function displayDiscoveries() {
     title.textContent = discovery.title;
 
     const date = document.createElement("p");
-    date.textContent = `📅 ${discovery.date}`;
+    date.textContent = `📅 ${discovery.date}${discovery.media_type === "video" ? " · 🎬 Video" : ""}`;
 
     const description = document.createElement("p");
-    description.textContent =
-      discovery.explanation
-        ? discovery.explanation.substring(0, 110) + "..."
-        : "Discover this amazing space image.";
+    description.textContent = discovery.explanation
+      ? discovery.explanation.substring(0, 110) + "..."
+      : "Discover this amazing space image.";
 
-    // ADD ELEMENTS TO CARD
-    cardInfo.appendChild(title);
-    cardInfo.appendChild(date);
-    cardInfo.appendChild(description);
+    cardInfo.append(title, date, description);
+    card.append(createMedia(discovery, false), cardInfo);
 
-    card.appendChild(image);
-    card.appendChild(cardInfo);
-
-    // OPEN MODAL WHEN CARD IS CLICKED
-    card.addEventListener("click", function() {
+    card.addEventListener("click", function (event) {
+      if (event.target.closest("a")) return;
       openImageModal(discovery);
     });
+    card.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openImageModal(discovery);
+      }
+    });
 
-    // ADD CARD TO GALLERY
     gallery.appendChild(card);
   }
-
 }
 
-// 7. OPEN IMAGE MODAL
+// 8. MODAL
 function openImageModal(discovery) {
+  const isVideo = discovery.media_type === "video";
+  const embeddable = isVideo && isHttps(discovery.url) && /youtube|vimeo|youtu\.be/.test(discovery.url);
 
-  modalImage.src = discovery.hdurl || discovery.url;
-  modalImage.alt = discovery.alt || discovery.title;
+  modalImage.hidden = isVideo;
+  modalVideo.hidden = !embeddable;
+
+  if (isVideo) {
+    modalImage.removeAttribute("src");
+    modalVideo.src = embeddable ? discovery.url : "";
+  } else {
+    modalVideo.src = "";
+    modalImage.onerror = function () {
+      if (discovery.url && modalImage.src !== discovery.url) modalImage.src = discovery.url;
+    };
+    modalImage.src = discovery.hdurl || discovery.url || "";
+  }
+
+  modalImage.alt = discovery.title;
   modalTitle.textContent = discovery.title;
   modalDate.textContent = `Date: ${discovery.date}`;
-  modalExplanation.textContent = discovery.explanation;
-  modalLink.href = discovery.permalink || discovery.url;
+  modalExplanation.textContent = discovery.explanation || "";
+  modalLink.href = `https://apod.nasa.gov/apod/ap${discovery.date.slice(2).replace(/-/g, "")}.html`;
 
   imageModal.style.display = "block";
 }
 
-// 8. CLOSE IMAGE MODAL
-closeModal.addEventListener("click", function() {
+function hideModal() {
   imageModal.style.display = "none";
-});
+  modalVideo.src = "";
+}
 
-imageModal.addEventListener("click", function(event) {
-  if (event.target === imageModal) {
-    imageModal.style.display = "none";
-  }
+closeModal.addEventListener("click", hideModal);
+document.addEventListener("keydown", function (event) {
+  if (event.key === "Escape" && imageModal.style.display === "block") hideModal();
+});
+imageModal.addEventListener("click", function (event) {
+  if (event.target === imageModal) hideModal();
 });
 
 // 9. DATE SELECTOR
-searchButton.addEventListener("click", function() {
-
+searchButton.addEventListener("click", function () {
   const selectedDate = startDateInput.value;
 
   if (!selectedDate) {
     errorMessage.textContent = "Please select a date.";
     return;
   }
-
-  const start = new Date(selectedDate + "T12:00:00");
-  const end = new Date(start);
-  end.setDate(end.getDate() + 8);
-
-  const endDate = end > today
-    ? todayString
-    : end.toISOString().split("T")[0];
-
-  getSpaceDiscoveries(selectedDate, endDate);
-
-});
-
-// 10. RANDOM DISCOVERY BUTTON
-randomButton.addEventListener("click", async function() {
-
-  loadingMessage.textContent = "🎲 Finding random discoveries...";
-
-  try {
-
-    const apiURL = new URL("https://api.nasa.gov/planetary/apod");
-    apiURL.search = new URLSearchParams({
-      count: "9",
-      api_key: NASA_API_KEY,
-    });
-
-    const response = await fetch(apiURL);
-
-    if (!response.ok) {
-      throw new Error("Random discovery request failed.");
-    }
-
-    const jsonData = await response.json();
-
-    spaceDiscoveries = Array.isArray(jsonData)
-      ? jsonData
-      : [jsonData];
-
-    displayDiscoveries();
-
-  } catch (error) {
-
-    console.error(error);
-
-    errorMessage.textContent =
-      "Could not find random discoveries.";
-
-    loadingMessage.textContent = "";
-
+  if (selectedDate < APOD_FIRST_DATE || selectedDate > todayString) {
+    errorMessage.textContent = `Please choose a date between ${APOD_FIRST_DATE} and ${todayString}.`;
+    return;
   }
 
+  loadDiscoveries(selectedDate, selectedDate);
 });
 
-// 11. START THE APPLICATION
-getSpaceDiscoveries(todayString, todayString);
+// 10. RANDOM DISCOVERY: random date within APOD's available range
+randomButton.addEventListener("click", function () {
+  const first = toMs(APOD_FIRST_DATE);
+  const last = toMs(todayString) - DAY_MS; // yesterday is always published
+  const randomDate = toDateString(
+    first + Math.floor(Math.random() * ((last - first) / DAY_MS + 1)) * DAY_MS
+  );
+
+  startDateInput.value = randomDate;
+  loadDiscoveries(randomDate, randomDate, "🎲 Finding a random discovery...");
+});
+
+// 11. START: today's picture plus the 8 days before it
+loadDiscoveries(toDateString(toMs(todayString) - 8 * DAY_MS), todayString);
