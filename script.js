@@ -54,14 +54,31 @@ startDateInput.max = todayString;
 startDateInput.value = todayString;
 
 // 3. NASA API HELPER
-async function fetchApod(params) {
+const NASA_APOD_URL = "https://api.nasa.gov/planetary/apod";
+// Set when the local proxy is missing (page not served by server.js)
+let proxyUnavailable = IS_GITHUB_PAGES;
+
+async function requestApod(params, direct) {
   const query = new URLSearchParams(params);
-  if (IS_GITHUB_PAGES) query.set("api_key", NASA_DEMO_KEY);
-  const response = await fetch(`${APOD_ENDPOINT}?${query}`);
+  if (direct) query.set("api_key", NASA_DEMO_KEY);
+  const response = await fetch(`${direct ? NASA_APOD_URL : APOD_ENDPOINT}?${query}`);
   let data;
   try {
     data = await response.json();
   } catch {
+    data = null;
+  }
+  return { response, data };
+}
+
+async function fetchApod(params) {
+  let { response, data } = await requestApod(params, proxyUnavailable);
+  if (!proxyUnavailable && data === null) {
+    // No JSON from /api/apod: fall back to NASA's public DEMO_KEY
+    proxyUnavailable = true;
+    ({ response, data } = await requestApod(params, true));
+  }
+  if (data === null) {
     throw new Error("NASA returned an unreadable response.");
   }
   if (!response.ok) {
