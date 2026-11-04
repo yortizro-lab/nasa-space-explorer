@@ -1,10 +1,14 @@
 // =====================================
 // NASA SPACE EXPLORER
-// Requests go to our own server (/api/apod), which adds the private
-// NASA API key. No key is stored in this public file.
+// Local requests use our server's private NASA key. GitHub Pages uses NASA's
+// public, rate-limited DEMO_KEY because Pages cannot run the server.
 // =====================================
 
-const APOD_ENDPOINT = "/api/apod";
+const IS_GITHUB_PAGES = window.location.hostname.endsWith(".github.io");
+const APOD_ENDPOINT = IS_GITHUB_PAGES
+  ? "https://api.nasa.gov/planetary/apod"
+  : "/api/apod";
+const NASA_DEMO_KEY = "DEMO_KEY";
 const APOD_FIRST_DATE = "1995-06-16";
 const DAY_MS = 86400000;
 
@@ -51,7 +55,9 @@ startDateInput.value = todayString;
 
 // 3. NASA API HELPER
 async function fetchApod(params) {
-  const response = await fetch(`${APOD_ENDPOINT}?${new URLSearchParams(params)}`);
+  const query = new URLSearchParams(params);
+  if (IS_GITHUB_PAGES) query.set("api_key", NASA_DEMO_KEY);
+  const response = await fetch(`${APOD_ENDPOINT}?${query}`);
   let data;
   try {
     data = await response.json();

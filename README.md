@@ -13,3 +13,14 @@ The browser never sees the NASA API key. `server.js` serves the site and forward
 For hosting, deploy `server.js` (or an equivalent serverless function) and set
 `NASA_API_KEY` as an environment variable in the host's dashboard.
 The key previously committed in `script.js` is in git history: revoke it and request a new one.
+
+## Publishing on GitHub Pages
+
+The GitHub Actions workflow publishes the static site to GitHub Pages whenever
+changes are pushed to `main`. In the repository settings, set **Pages > Build
+and deployment > Source** to **GitHub Actions**.
+
+GitHub Pages cannot run `server.js`, so the site uses NASA's public `DEMO_KEY`
+for browser requests when opened from a `*.github.io` domain. NASA heavily
+rate-limits this key; use the server setup above for a private API key and more
+reliable API access.
