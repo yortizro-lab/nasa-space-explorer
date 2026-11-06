@@ -54,9 +54,22 @@
     </section>
   </main>
 
-  <div class="modal" id="imageModal">
+  <div
+    class="modal"
+    id="imageModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalTitle"
+    aria-describedby="modalExplanation"
+    aria-hidden="true"
+  >
     <div class="modal-content">
-      <button class="close-button" id="closeModal">&times;</button>
+      <button
+        class="close-button"
+        id="closeModal"
+        type="button"
+        aria-label="Close discovery details"
+      >&times;</button>
       <img id="modalImage" src="" alt="NASA space discovery">
       <iframe id="modalVideo" title="NASA video" allowfullscreen hidden></iframe>
       <h2 id="modalTitle"></h2>

@@ -33,6 +33,7 @@ const closeModal = document.getElementById("closeModal");
 
 let spaceDiscoveries = [];
 let latestRequestId = 0;
+let modalReturnFocus = null;
 
 // 2. DATE HELPERS (calendar dates as YYYY-MM-DD, handled in UTC to avoid shifts)
 function toDateString(ms) {
@@ -72,7 +73,16 @@ async function requestApod(params, direct) {
 }
 
 async function fetchApod(params) {
-  let { response, data } = await requestApod(params, proxyUnavailable);
+  let response;
+  let data;
+  try {
+    ({ response, data } = await requestApod(params, proxyUnavailable));
+  } catch (error) {
+    if (proxyUnavailable) throw error;
+    proxyUnavailable = true;
+    ({ response, data } = await requestApod(params, true));
+  }
+
   if (!proxyUnavailable && data === null) {
     // No JSON from /api/apod: fall back to NASA's public DEMO_KEY
     proxyUnavailable = true;
@@ -111,7 +121,12 @@ async function loadDiscoveries(startDate, focusDate, loadingText) {
       // Today's picture may not be published yet (NASA publishes in US time)
       if (endDate !== todayString || error.status !== 400) throw error;
       endDate = toDateString(endMs - DAY_MS);
-      results = await fetchApod({ start_date: startDate, end_date: endDate, thumbs: "true" });
+      const retryStartDate = startDate > endDate ? endDate : startDate;
+      results = await fetchApod({
+        start_date: retryStartDate,
+        end_date: endDate,
+        thumbs: "true",
+      });
     }
 
     if (requestId !== latestRequestId) return;
@@ -256,8 +271,9 @@ function displayDiscoveries() {
     date.textContent = `📅 ${discovery.date}${discovery.media_type === "video" ? " · 🎬 Video" : ""}`;
 
     const description = document.createElement("p");
-    description.textContent = discovery.explanation
-      ? discovery.explanation.substring(0, 110) + "..."
+    const explanation = discovery.explanation || "";
+    description.textContent = explanation
+      ? explanation.substring(0, 110) + (explanation.length > 110 ? "..." : "")
       : "Discover this amazing space image.";
 
     const action = document.createElement("span");
@@ -284,6 +300,7 @@ function displayDiscoveries() {
 
 // 8. MODAL
 function openImageModal(discovery) {
+  modalReturnFocus = document.activeElement;
   const isVideo = discovery.media_type === "video";
   const embeddable = isVideo && isHttps(discovery.url) && /youtube|vimeo|youtu\.be/.test(discovery.url);
 
@@ -308,12 +325,17 @@ function openImageModal(discovery) {
     || "NASA hasn't provided an explanation for this discovery.";
   modalLink.href = `https://apod.nasa.gov/apod/ap${discovery.date.slice(2).replace(/-/g, "")}.html`;
 
+  imageModal.setAttribute("aria-hidden", "false");
   imageModal.style.display = "block";
+  closeModal.focus();
 }
 
 function hideModal() {
+  imageModal.setAttribute("aria-hidden", "true");
   imageModal.style.display = "none";
   modalVideo.src = "";
+  if (modalReturnFocus instanceof HTMLElement) modalReturnFocus.focus();
+  modalReturnFocus = null;
 }
 
 closeModal.addEventListener("click", hideModal);
