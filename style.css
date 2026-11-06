@@ -9,6 +9,10 @@ html {
   scroll-behavior: smooth;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 body {
   font-family: Arial, sans-serif;
   background: #050817;
@@ -83,8 +87,13 @@ nav a:hover {
 }
 
 .explore-button:hover,
-.controls button:hover {
+.controls button:hover:not(:disabled) {
   background: #45b8ff;
+}
+
+.controls button:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .gallery-section {
@@ -142,6 +151,14 @@ nav a:hover {
 .space-card:focus-visible {
   transform: translateY(-6px);
   border-color: #65c9ff;
+}
+
+.space-card:hover .space-card img {
+  transform: scale(1.08);
+}
+
+.space-card img {
+  transition: transform 0.3s ease-in-out;
 }
 
 .space-card:focus-visible {
@@ -275,6 +292,17 @@ nav a:hover {
   color: #65c9ff;
 }
 
+.space-fact {
+  margin: 20px;
+  padding: 15px 20px;
+  background: #0b1025;
+  border-left: 4px solid #65c9ff;
+  color: #aebbd3;
+  border-radius: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
 .error {
   color: #ff8585;
 }
@@ -340,6 +368,23 @@ footer {
   .header {
     flex-direction: column;
     gap: 12px;
+  }
+
+  nav a {
+    margin: 0 10px;
+  }
+
+  .hero {
+    padding: 70px 16px;
+  }
+
+  .modal {
+    padding: 10px;
+  }
+
+  .modal-content {
+    margin: 10px auto;
+    padding: 20px 16px;
   }
 
   .gallery {

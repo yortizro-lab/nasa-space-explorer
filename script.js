@@ -17,6 +17,7 @@ const gallery = document.getElementById("galleryContainer");
 const featured = document.getElementById("featured");
 const loadingMessage = document.getElementById("loadingMessage");
 const errorMessage = document.getElementById("errorMessage");
+const spaceFactMessage = document.getElementById("spaceFactMessage");
 
 const startDateInput = document.getElementById("startDate");
 const searchButton = document.getElementById("searchButton");
@@ -34,6 +35,23 @@ const closeModal = document.getElementById("closeModal");
 let spaceDiscoveries = [];
 let latestRequestId = 0;
 let modalReturnFocus = null;
+
+const SPACE_FACTS = [
+  "🌌 Light from distant galaxies has been traveling for billions of years to reach us, showing us the universe as it was in the past.",
+  "🚀 NASA's Voyager 1, launched in 1977, is still sending data from interstellar space and is humanity's farthest spacecraft.",
+  "⭐ The Sun is so massive that it accounts for 99.86% of all the mass in our entire solar system.",
+  "🪐 Jupiter's Great Red Spot is a storm that has been raging for at least 350 years and is larger than Earth.",
+  "🌍 Earth's atmosphere extends about 120 kilometers into space, marking the boundary of outer space.",
+  "💫 A single teaspoon of neutron star material would weigh as much as 6 billion tons on Earth.",
+  "🛰️ The International Space Station orbits Earth approximately every 90 minutes at 17,500 miles per hour.",
+  "🌙 The Moon is slowly drifting away from Earth at a rate of about 1.5 inches per year.",
+  "☄️ An asteroid impact 66 million years ago led to the extinction of the dinosaurs.",
+  "✨ There are more stars in the universe than grains of sand on all Earth's beaches and deserts combined.",
+];
+
+function getRandomSpaceFact() {
+  return SPACE_FACTS[Math.floor(Math.random() * SPACE_FACTS.length)];
+}
 
 // 2. DATE HELPERS (calendar dates as YYYY-MM-DD, handled in UTC to avoid shifts)
 function toDateString(ms) {
@@ -109,6 +127,7 @@ async function loadDiscoveries(startDate, focusDate, loadingText) {
   errorMessage.textContent = "";
   gallery.innerHTML = "";
   featured.hidden = true;
+  searchButton.disabled = randomButton.disabled = true;
 
   const endMs = Math.min(toMs(startDate) + 8 * DAY_MS, toMs(todayString));
   let endDate = toDateString(endMs);
@@ -145,13 +164,15 @@ async function loadDiscoveries(startDate, focusDate, loadingText) {
 
     displayFeatured(focus);
     displayDiscoveries();
-    loadingMessage.textContent = `✨ Found ${spaceDiscoveries.length} discoveries!`;
+    loadingMessage.textContent = "";
   } catch (error) {
     console.error("NASA API Error:", error);
     if (requestId !== latestRequestId) return;
     errorMessage.textContent =
       `Unable to load NASA discoveries. ${error.message || "Please try again."}`;
     loadingMessage.textContent = "";
+  } finally {
+    if (requestId === latestRequestId) searchButton.disabled = randomButton.disabled = false;
   }
 }
 
@@ -247,6 +268,9 @@ function displayFeatured(discovery) {
 // 7. GALLERY CARDS
 function displayDiscoveries() {
   gallery.innerHTML = "";
+  
+  spaceFactMessage.textContent = getRandomSpaceFact();
+  spaceFactMessage.hidden = false;
 
   for (let i = 0; i < spaceDiscoveries.length; i++) {
     const discovery = spaceDiscoveries[i];
@@ -327,12 +351,14 @@ function openImageModal(discovery) {
 
   imageModal.setAttribute("aria-hidden", "false");
   imageModal.style.display = "block";
+  document.body.classList.add("modal-open");
   closeModal.focus();
 }
 
 function hideModal() {
   imageModal.setAttribute("aria-hidden", "true");
   imageModal.style.display = "none";
+  document.body.classList.remove("modal-open");
   modalVideo.src = "";
   if (modalReturnFocus instanceof HTMLElement) modalReturnFocus.focus();
   modalReturnFocus = null;
@@ -340,7 +366,26 @@ function hideModal() {
 
 closeModal.addEventListener("click", hideModal);
 document.addEventListener("keydown", function (event) {
-  if (event.key === "Escape" && imageModal.style.display === "block") hideModal();
+  if (imageModal.style.display !== "block") return;
+  if (event.key === "Escape") return hideModal();
+  if (event.key !== "Tab") return;
+
+  // Keep keyboard focus inside the open dialog
+  const focusable = [...imageModal.querySelectorAll("a[href], button, iframe")]
+    .filter((el) => !el.hidden && el.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!imageModal.contains(document.activeElement)) {
+    event.preventDefault();
+    first.focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 });
 imageModal.addEventListener("click", function (event) {
   if (event.target === imageModal) hideModal();
@@ -360,6 +405,10 @@ searchButton.addEventListener("click", function () {
   }
 
   loadDiscoveries(selectedDate, selectedDate);
+});
+
+startDateInput.addEventListener("keydown", function (event) {
+  if (event.key === "Enter") searchButton.click();
 });
 
 // 10. RANDOM DISCOVERY: random date within APOD's available range
