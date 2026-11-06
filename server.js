@@ -17,8 +17,7 @@ if (fs.existsSync(ENV_FILE)) {
 const PORT = process.env.PORT || 3000;
 const API_KEY = (process.env.NASA_API_KEY || "").trim();
 if (!API_KEY) {
-  console.error("Missing NASA_API_KEY. Add it to the project-root .env file.");
-  process.exit(1);
+  console.error("NASA_API_KEY is missing. The site will start, but APOD requests will be unavailable.");
 }
 const ROOT = __dirname;
 const ALLOWED = ["date", "start_date", "end_date", "count", "thumbs"];
@@ -33,6 +32,9 @@ const TYPES = {
 const PUBLIC_FILES = new Set(["index.html", "style.css", "script.js"]);
 
 async function proxyApod(url, res) {
+  if (!API_KEY) {
+    return send(res, 503, { error: "NASA API key is not configured on the server." });
+  }
   const params = new URLSearchParams();
   for (const key of ALLOWED) {
     const value = url.searchParams.get(key);
@@ -49,9 +51,18 @@ async function proxyApod(url, res) {
       signal: AbortSignal.timeout(15000),
     });
     const body = await upstream.text();
-    res.writeHead(upstream.status, { "Content-Type": "application/json" });
+    try {
+      JSON.parse(body);
+    } catch {
+      console.error(`NASA API returned an unreadable response (HTTP ${upstream.status}).`);
+      return send(res, upstream.ok ? 502 : upstream.status, {
+        error: `NASA API returned an unreadable response (HTTP ${upstream.status}).`,
+      });
+    }
+    res.writeHead(upstream.status, { "Content-Type": "application/json; charset=utf-8" });
     res.end(body);
-  } catch {
+  } catch (error) {
+    console.error(`NASA API request failed (${error.name || "Error"}).`);
     send(res, 502, { error: "Could not reach NASA API" });
   }
 }
@@ -65,7 +76,13 @@ http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (url.pathname === "/api/apod") return proxyApod(url, res);
 
-  let rel = decodeURIComponent(url.pathname).replace(/^\/+/, "") || "index.html";
+  let rel;
+  try {
+    rel = decodeURIComponent(url.pathname).replace(/^\/+/, "") || "index.html";
+  } catch (error) {
+    if (!(error instanceof URIError)) throw error;
+    return send(res, 400, { error: "Invalid URL encoding" });
+  }
   const isAsset = rel.startsWith("imagenes/") && !rel.includes("..");
   if (!PUBLIC_FILES.has(rel) && !isAsset) return send(res, 404, { error: "Not found" });
   fs.readFile(path.join(ROOT, rel), (err, data) => {
@@ -73,4 +90,6 @@ http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": TYPES[path.extname(rel)] || "application/octet-stream" });
     res.end(data);
   });
-}).listen(PORT, () => console.log(`NASA Space Explorer on http://localhost:${PORT}`));
+}).listen(PORT, "0.0.0.0", function () {
+  console.log(`NASA Space Explorer listening on 0.0.0.0:${this.address().port}`);
+});

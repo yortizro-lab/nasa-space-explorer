@@ -39,7 +39,8 @@ the old key from the current files does not remove it from Git history.
    ```
 
    The `.env` file is ignored by Git. Never commit or share it. Restart the
-   server after changing the key.
+   server after changing the key. If the key is missing, the website still
+   starts, but APOD requests return an error until a key is configured.
 4. In the project folder, start the server:
 
    ```bash
@@ -84,7 +85,8 @@ before creating or deploying an app.
    Follow the prompts to choose an app name, organization, and region. No
    database is required. Review the machine size and costs. Fly generates a
    `fly.toml` file; confirm its HTTP service `internal_port` is `3000`, matching
-   the Dockerfile. The app name must be unique.
+   the Dockerfile. If a `PORT` environment variable is set, it must match
+   `internal_port`. The app name must be unique.
 3. Add your **new** NASA key as a Fly secret before deploying. In a Bash
    terminal, run the following; enter the key at the prompt. It will not be
    displayed as you type or placed in your shell history:
@@ -128,10 +130,11 @@ Fly.io address instead when you want visitors to use the server-backed version.
 - **Rate limit exceeded:** Wait for NASA's limit to reset. GitHub Pages always
   uses `DEMO_KEY`, even if you have configured a key locally or on Fly.io.
 - **Fly deployment fails:** Run `fly logs` and check that `NASA_API_KEY` is
-  configured and that `internal_port` in `fly.toml` is `3000`.
+  configured and that `internal_port` in `fly.toml` matches `PORT` (normally
+  `3000`). A startup message reports the actual address and port.
 - **The Codespace page does not open:** Make sure `node server.js` is still
   running, then open the forwarded port **3000** in the **Ports** tab.
 
 ## Tests
 
-Run `node --test tests/gallery.test.js` to check gallery date and loading logic.
+Run `node --test tests/*.test.js` to check gallery and server behavior.
