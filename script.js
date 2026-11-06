@@ -118,7 +118,7 @@ async function fetchApod(params) {
   return Array.isArray(data) ? data : [data];
 }
 
-// 4. LOAD DISCOVERIES: 9 entries starting at startDate.
+// 4. LOAD DISCOVERIES: 9 entries starting at startDate when available.
 // The entry whose date equals `focusDate` is shown in the featured panel.
 async function loadDiscoveries(startDate, focusDate, loadingText) {
   const requestId = ++latestRequestId;
@@ -127,22 +127,25 @@ async function loadDiscoveries(startDate, focusDate, loadingText) {
   errorMessage.textContent = "";
   gallery.innerHTML = "";
   featured.hidden = true;
+  spaceFactMessage.hidden = true;
   searchButton.disabled = randomButton.disabled = true;
 
-  const endMs = Math.min(toMs(startDate) + 8 * DAY_MS, toMs(todayString));
+  let endMs = Math.min(toMs(startDate) + 8 * DAY_MS, toMs(todayString));
   let endDate = toDateString(endMs);
+  let rangeStart = toDateString(endMs - 8 * DAY_MS);
 
   try {
     let results;
     try {
-      results = await fetchApod({ start_date: startDate, end_date: endDate, thumbs: "true" });
+      results = await fetchApod({ start_date: rangeStart, end_date: endDate, thumbs: "true" });
     } catch (error) {
       // Today's picture may not be published yet (NASA publishes in US time)
       if (endDate !== todayString || error.status !== 400) throw error;
-      endDate = toDateString(endMs - DAY_MS);
-      const retryStartDate = startDate > endDate ? endDate : startDate;
+      endMs -= DAY_MS;
+      endDate = toDateString(endMs);
+      rangeStart = toDateString(endMs - 8 * DAY_MS);
       results = await fetchApod({
-        start_date: retryStartDate,
+        start_date: rangeStart,
         end_date: endDate,
         thumbs: "true",
       });
@@ -150,21 +153,35 @@ async function loadDiscoveries(startDate, focusDate, loadingText) {
 
     if (requestId !== latestRequestId) return;
 
-    // JSON -> sorted array, newest/oldest consistent by date
+    // Some successful responses omit today's unpublished entry.
+    if (endDate === todayString && results.length === 8 &&
+        results.every((item) => item.date !== todayString)) {
+      endMs -= DAY_MS;
+      endDate = toDateString(endMs);
+      rangeStart = toDateString(endMs - 8 * DAY_MS);
+      results = await fetchApod({ start_date: rangeStart, end_date: endDate, thumbs: "true" });
+      if (requestId !== latestRequestId) return;
+    }
+
+    const dates = new Set(results.map((item) => item.date));
+    if (results.length !== 9 || dates.size !== 9 ||
+        Array.from({ length: 9 }, (_, i) => toDateString(toMs(rangeStart) + i * DAY_MS))
+          .some((date) => !dates.has(date))) {
+      throw new Error("NASA did not return nine consecutive discoveries. Please try another date.");
+    }
+
     spaceDiscoveries = results.sort((a, b) => a.date.localeCompare(b.date));
 
     const focus =
       spaceDiscoveries.find((d) => d.date === focusDate) ||
       spaceDiscoveries[spaceDiscoveries.length - 1];
 
-    if (!focus) {
-      loadingMessage.textContent = "No discoveries found for this selection.";
-      return;
-    }
-
     displayFeatured(focus);
     displayDiscoveries();
     loadingMessage.textContent = "";
+    if (focusDate > endDate) {
+      errorMessage.textContent = `The discovery for ${focusDate} is not available yet. Showing the latest nine available days.`;
+    }
   } catch (error) {
     console.error("NASA API Error:", error);
     if (requestId !== latestRequestId) return;
@@ -268,7 +285,7 @@ function displayFeatured(discovery) {
 // 7. GALLERY CARDS
 function displayDiscoveries() {
   gallery.innerHTML = "";
-  
+
   spaceFactMessage.textContent = getRandomSpaceFact();
   spaceFactMessage.hidden = false;
 

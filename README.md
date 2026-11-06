@@ -10,6 +10,12 @@ The browser never sees the NASA API key. `server.js` serves the site and forward
 2. Create a `.env` file (git-ignored): `NASA_API_KEY=your_key_here`
 3. Run `node server.js` and open http://localhost:3000
 
+The selected date starts a nine-day gallery when those days are available. For
+dates close to today, the gallery shifts back to show nine consecutive days,
+while featuring the selected date. If today's APOD has not been published, the
+gallery shows the nine days ending yesterday and notes that today's entry is
+unavailable. An incomplete API response is reported as an error.
+
 For hosting, deploy `server.js` (or an equivalent serverless function) and set
 `NASA_API_KEY` as an environment variable in the host's dashboard.
 The key previously committed in `script.js` is in git history: revoke it and request a new one.
