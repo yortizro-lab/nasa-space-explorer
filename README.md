@@ -2,31 +2,56 @@
 
 Explore NASA's Astronomy Picture of the Day (APOD) images and videos.
 
-## How the API key works
+## Choose how to run the app
 
-Your browser asks `server.js` for discoveries. The server adds your NASA API key
-when it requests data from NASA, then sends the results back to the browser.
-Keep the key private: do not put it in `script.js`, share it, or commit it to Git.
+- **Try it in your Codespace:** Follow [Run locally](#run-locally).
+- **Share a public website using your NASA key:** Follow
+  [Publish on Fly.io](#publish-on-flyio). Hosting may cost money.
+- **Use the existing GitHub Pages site:** See [GitHub Pages](#github-pages).
+  It uses a rate-limited demo key, not your personal key.
 
-An earlier key was committed to this repository's Git history. Revoke that key
-and get a new one from [NASA](https://api.nasa.gov/); removing it from the
-current files does not remove it from history.
+## Keep your NASA key private
+
+The browser asks `server.js` for discoveries. The server adds the key to its
+request to NASA and sends the results back to the browser without exposing the
+key. Never put your key in `script.js`, commit it, or share it.
+
+**Important:** An earlier key was committed to this repository's Git history.
+Revoke that key and get a new one from [NASA](https://api.nasa.gov/). Removing
+the old key from the current files does not remove it from Git history.
 
 ## Run locally
 
-1. Install Node.js 22 or later.
-2. Get a NASA API key from https://api.nasa.gov/.
-3. In the project folder, create a file named `.env` containing this line,
-   replacing the example with your key:
+1. Open a terminal in VS Code and check Node.js:
+
+   ```bash
+   node --version
+   ```
+
+   Use Node.js 22 or later. If Node is missing or older, install a current
+   version from [nodejs.org](https://nodejs.org/).
+2. Get a NASA API key from [api.nasa.gov](https://api.nasa.gov/).
+3. In the project folder, create a file named `.env`, or open it if it already
+   exists. Add or update this line, replacing `your_key_here` with your key:
 
    ```text
    NASA_API_KEY=your_key_here
    ```
 
-   The `.env` file is ignored by Git. Never commit or share it.
-4. In the project folder, run `node server.js`. Open
-   http://localhost:3000, or use the forwarded port 3000 in VS Code Codespaces.
-   Leave the terminal running; press Ctrl+C to stop the server.
+   The `.env` file is ignored by Git. Never commit or share it. Restart the
+   server after changing the key.
+4. In the project folder, start the server:
+
+   ```bash
+   node server.js
+   ```
+
+5. On your computer, open http://localhost:3000. In a Codespace, open VS Code's
+   **Ports** tab and click the forwarded address for port **3000**, or choose
+   **Open in Browser** when prompted.
+
+Leave the terminal running while you use the app. Press **Ctrl+C** in that
+terminal to stop the server.
 
 The gallery normally starts at the selected date and shows nine consecutive
 days. Near today, the range shifts backward to include nine days. If today's
@@ -42,8 +67,14 @@ before creating or deploying an app.
 
 1. Create a [Fly.io account](https://fly.io/) and
    [install flyctl](https://fly.io/docs/flyctl/install/) in your Codespace or
-   computer. Follow the installer's instructions to add it to your PATH, then
-   run `fly auth login`.
+   computer. Follow the installer's instructions to add it to your PATH.
+   Sign in from the terminal:
+
+   ```bash
+   fly auth login
+   ```
+
+   Complete the sign-in in your browser.
 2. In this project's folder, run:
 
    ```bash
@@ -64,9 +95,10 @@ before creating or deploying an app.
    unset NASA_KEY
    ```
 
-   Fly encrypts the secret and supplies it to the server at runtime. Do not put
-   the key in `fly.toml` or the Dockerfile. `fly secrets list` shows the names
-   of configured secrets, not their values.
+   If the import reports an error, resolve it and repeat this step before
+   deploying. Fly encrypts the secret and supplies it to the server at runtime.
+   Do not put the key in `fly.toml` or the Dockerfile. `fly secrets list` shows
+   the names of configured secrets, not their values.
 4. Deploy and open the app:
 
    ```bash
@@ -76,9 +108,8 @@ before creating or deploying an app.
 
    `--ha=false` avoids automatically creating a spare machine on the first
    deployment; check your Fly dashboard for actual machine count and charges.
-   If deployment fails, check `fly logs` and confirm `NASA_API_KEY` is set.
-   A NASA key can still be rate-limited; if this happens, wait for the limit to
-   reset.
+   The second command opens the new Fly website in your browser. Share that
+   address with others; it is different from your GitHub Pages address.
 
 The Dockerfile copies only the files needed to run the site. `.dockerignore`
 keeps `.env` and other unneeded files out of the build context.
@@ -89,6 +120,17 @@ The GitHub Actions workflow also publishes the static site to GitHub Pages.
 Pages cannot run `server.js`, so the GitHub Pages version uses NASA's public,
 heavily rate-limited `DEMO_KEY` and does not use your Fly secret. Share the
 Fly.io address instead when you want visitors to use the server-backed version.
+
+## Troubleshooting
+
+- **Missing NASA_API_KEY:** Check the `.env` line for local use, or run
+  `fly secrets list` for Fly.io. Restart the local server after editing `.env`.
+- **Rate limit exceeded:** Wait for NASA's limit to reset. GitHub Pages always
+  uses `DEMO_KEY`, even if you have configured a key locally or on Fly.io.
+- **Fly deployment fails:** Run `fly logs` and check that `NASA_API_KEY` is
+  configured and that `internal_port` in `fly.toml` is `3000`.
+- **The Codespace page does not open:** Make sure `node server.js` is still
+  running, then open the forwarded port **3000** in the **Ports** tab.
 
 ## Tests
 
