@@ -1,0 +1,8 @@
+*
+!Dockerfile
+!server.js
+!index.html
+!script.js
+!style.css
+!imagenes/
+!imagenes/**
