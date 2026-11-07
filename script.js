@@ -22,6 +22,10 @@ const spaceFactMessage = document.getElementById("spaceFactMessage");
 const startDateInput = document.getElementById("startDate");
 const searchButton = document.getElementById("searchButton");
 const randomButton = document.getElementById("randomButton");
+const marsButton = document.getElementById("marsButton");
+const marsGallery = document.getElementById("marsGallery");
+const marsLoading = document.getElementById("marsLoading");
+const marsError = document.getElementById("marsError");
 
 const imageModal = document.getElementById("imageModal");
 const modalImage = document.getElementById("modalImage");
@@ -74,6 +78,7 @@ startDateInput.value = todayString;
 
 // 3. NASA API HELPER
 const NASA_APOD_URL = "https://api.nasa.gov/planetary/apod";
+const NASA_SCIENCE_APOD_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic";
 // Set when the local proxy is missing (page not served by server.js)
 let proxyUnavailable = IS_GITHUB_PAGES;
 
@@ -115,7 +120,56 @@ async function fetchApod(params) {
     error.status = response.status;
     throw error;
   }
-  return Array.isArray(data) ? data : [data];
+  const entries = Array.isArray(data) ? data : [data];
+  if (entries.some((entry) => isNasaLogo(entry.url) || isNasaLogo(entry.hdurl))) {
+    return fetchScienceDiscoveries(params.start_date, params.end_date);
+  }
+  return entries;
+}
+
+function isNasaLogo(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === "science.nasa.gov" && /\/nasa-logo(?:@[\dx]+)?\./i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function plainText(html) {
+  const doc = new DOMParser().parseFromString(html || "", "text/html");
+  return doc.body.textContent.trim();
+}
+
+async function fetchScienceDiscoveries(startDate, endDate) {
+  const dates = [];
+  for (let time = toMs(startDate); time <= toMs(endDate); time += DAY_MS) {
+    dates.push(toDateString(time));
+  }
+  return Promise.all(dates.map(async (date) => {
+    const response = await fetch(`${NASA_SCIENCE_APOD_URL}/${date.slice(2).replace(/-/g, "")}`);
+    if (!response.ok) {
+      const error = new Error(`NASA's current APOD service could not load ${date} (HTTP ${response.status}).`);
+      error.status = response.status === 404 && date === todayString ? 400 : response.status;
+      throw error;
+    }
+    const entry = await response.json();
+    if (entry.date !== date) throw new Error(`NASA returned an incorrect discovery date for ${date}.`);
+    const html = new DOMParser().parseFromString(entry.basic_html || "", "text/html");
+    const frameSource = html.querySelector("iframe")?.getAttribute("src");
+    const videoUrl = frameSource?.startsWith("//") ? `https:${frameSource}` : frameSource;
+    return {
+      date: entry.date,
+      title: entry.title,
+      explanation: plainText(entry.explanation),
+      copyright: plainText(entry.copyright),
+      media_type: entry.media_type,
+      url: entry.media_type === "video" ? videoUrl : entry.hdurl,
+      hdurl: entry.media_type === "image" ? entry.hdurl : undefined,
+      thumbnail_url: entry.media_type === "video" ? entry.hdurl : undefined,
+      permalink: entry.permalink,
+    };
+  }));
 }
 
 // 4. LOAD DISCOVERIES: 9 entries starting at startDate when available.
@@ -206,7 +260,8 @@ function createMissingMedia(discovery) {
   const box = document.createElement("div");
   box.className = "video-placeholder";
   const link = document.createElement("a");
-  link.href = discovery.url && isHttps(discovery.url) ? discovery.url : "https://apod.nasa.gov/apod/";
+  link.href = discovery.media_type === "video" && isHttps(discovery.url)
+    ? discovery.url : discoveryPage(discovery);
   link.target = "_blank";
   link.rel = "noopener";
   link.textContent = discovery.media_type === "video"
@@ -216,32 +271,39 @@ function createMissingMedia(discovery) {
   return box;
 }
 
+function discoveryPage(discovery) {
+  if (isHttps(discovery.permalink)) return discovery.permalink;
+  return `https://apod.nasa.gov/apod/ap${discovery.date.slice(2).replace(/-/g, "")}.html`;
+}
+
+function imageSources(discovery, useHd) {
+  const urls = discovery.media_type === "video"
+    ? [discovery.thumbnail_url]
+    : useHd ? [discovery.hdurl, discovery.url] : [discovery.url, discovery.hdurl];
+  return [...new Set(urls.map((url) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "http:") parsed.protocol = "https:";
+      return parsed.protocol === "https:" && !isNasaLogo(parsed.href) ? parsed.href : null;
+    } catch {
+      return null;
+    }
+  }).filter(Boolean))];
+}
+
 // Image element for a discovery; falls back to a link if loading fails
 function createMedia(discovery, useHd) {
-  if (discovery.media_type === "video") {
-    if (discovery.thumbnail_url && isHttps(discovery.thumbnail_url)) {
-      const thumb = document.createElement("img");
-      thumb.src = discovery.thumbnail_url;
-      thumb.alt = `Video thumbnail: ${discovery.title}`;
-      thumb.loading = "lazy";
-      return thumb;
-    }
-    return createMissingMedia(discovery);
-  }
-
-  const source = (useHd && discovery.hdurl) || discovery.url;
-  if (!source || !isHttps(source)) return createMissingMedia(discovery);
-
+  const sources = imageSources(discovery, useHd);
+  if (!sources.length) return createMissingMedia(discovery);
   const image = document.createElement("img");
-  image.src = source;
-  image.alt = discovery.title;
+  let index = 0;
+  image.src = sources[index];
+  image.alt = discovery.media_type === "video" ? `Video thumbnail: ${discovery.title}` : discovery.title;
   image.loading = "lazy";
   image.addEventListener("error", function () {
-    if (useHd && discovery.hdurl && image.src !== discovery.url && discovery.url) {
-      image.src = discovery.url;
-      return;
-    }
-    image.replaceWith(createMissingMedia(discovery));
+    index += 1;
+    if (index < sources.length) image.src = sources[index];
+    else image.replaceWith(createMissingMedia(discovery));
   });
   return image;
 }
@@ -289,9 +351,12 @@ function displayDiscoveries() {
   spaceFactMessage.textContent = getRandomSpaceFact();
   spaceFactMessage.hidden = false;
 
-  for (let i = 0; i < spaceDiscoveries.length; i++) {
-    const discovery = spaceDiscoveries[i];
+  for (const discovery of spaceDiscoveries) {
+    gallery.appendChild(createDiscoveryCard(discovery));
+  }
+}
 
+function createDiscoveryCard(discovery) {
     const card = document.createElement("div");
     card.className = "space-card";
     card.tabIndex = 0;
@@ -309,7 +374,7 @@ function displayDiscoveries() {
     title.textContent = discovery.title;
 
     const date = document.createElement("p");
-    date.textContent = `📅 ${discovery.date}${discovery.media_type === "video" ? " · 🎬 Video" : ""}`;
+    date.textContent = `📅 ${discovery.dateLabel ? `${discovery.dateLabel}: ` : ""}${discovery.date}${discovery.media_type === "video" ? " · 🎬 Video" : ""}`;
 
     const description = document.createElement("p");
     const explanation = discovery.explanation || "";
@@ -335,8 +400,7 @@ function displayDiscoveries() {
       }
     });
 
-    gallery.appendChild(card);
-  }
+    return card;
 }
 
 // 8. MODAL
@@ -345,26 +409,36 @@ function openImageModal(discovery) {
   const isVideo = discovery.media_type === "video";
   const embeddable = isVideo && isHttps(discovery.url) && /youtube|vimeo|youtu\.be/.test(discovery.url);
 
-  modalImage.hidden = isVideo;
+  const sources = isVideo ? [] : imageSources(discovery, true);
+  modalImage.hidden = isVideo || !sources.length;
   modalVideo.hidden = !embeddable;
+  const modalMediaError = document.getElementById("modalMediaError");
+  modalMediaError.hidden = isVideo || sources.length > 0;
 
   if (isVideo) {
     modalImage.removeAttribute("src");
     modalVideo.src = embeddable ? discovery.url : "";
   } else {
     modalVideo.src = "";
+    let index = 0;
     modalImage.onerror = function () {
-      if (discovery.url && modalImage.src !== discovery.url) modalImage.src = discovery.url;
+      index += 1;
+      if (index < sources.length) modalImage.src = sources[index];
+      else {
+        modalImage.hidden = true;
+        modalMediaError.hidden = false;
+      }
     };
-    modalImage.src = discovery.hdurl || discovery.url || "";
+    if (sources.length) modalImage.src = sources[0];
+    else modalImage.removeAttribute("src");
   }
 
   modalImage.alt = discovery.title;
   modalTitle.textContent = discovery.title;
-  modalDate.textContent = `Date: ${discovery.date}`;
+  modalDate.textContent = `${discovery.dateLabel || "Date"}: ${discovery.date}`;
   modalExplanation.textContent = discovery.explanation
     || "NASA hasn't provided an explanation for this discovery.";
-  modalLink.href = `https://apod.nasa.gov/apod/ap${discovery.date.slice(2).replace(/-/g, "")}.html`;
+  modalLink.href = discoveryPage(discovery);
 
   imageModal.setAttribute("aria-hidden", "false");
   imageModal.style.display = "block";
@@ -426,6 +500,48 @@ searchButton.addEventListener("click", function () {
 
 startDateInput.addEventListener("keydown", function (event) {
   if (event.key === "Enter") searchButton.click();
+});
+
+// NASA's image library contains published rover imagery and matching descriptions.
+marsButton.addEventListener("click", async function () {
+  marsButton.disabled = true;
+  marsLoading.textContent = "Loading Mars rover images...";
+  marsError.textContent = "";
+  marsGallery.innerHTML = "";
+  try {
+    const query = new URLSearchParams({
+      q: "Mars rover Curiosity", media_type: "image", page_size: "9",
+    });
+    const response = await fetch(`https://images-api.nasa.gov/search?${query}`);
+    if (!response.ok) throw new Error(`NASA image library returned HTTP ${response.status}.`);
+    const data = await response.json();
+    if (!Array.isArray(data.collection?.items)) throw new Error("NASA image library returned an invalid response.");
+    if (!data.collection.items.length) throw new Error("NASA image library returned no Mars rover images.");
+    for (const item of data.collection.items) {
+      const metadata = item.data?.[0];
+      if (!metadata?.nasa_id || !metadata.title) throw new Error("A NASA image record is missing its title or identifier.");
+      const images = (item.links || []).filter((link) => link.render === "image");
+      const discovery = {
+        title: metadata.title,
+        date: metadata.date_created?.slice(0, 10) || "Not provided",
+        dateLabel: "Library date",
+        explanation: metadata.description || "No description provided by NASA.",
+        media_type: "image",
+        url: images.find((link) => link.rel === "alternate")?.href
+          || images.find((link) => link.rel === "preview")?.href,
+        hdurl: images.find((link) => link.rel === "canonical")?.href,
+        permalink: `https://images.nasa.gov/details-${encodeURIComponent(metadata.nasa_id)}`,
+      };
+      marsGallery.appendChild(createDiscoveryCard(discovery));
+    }
+  } catch (error) {
+    console.error("NASA image library error:", error);
+    marsGallery.innerHTML = "";
+    marsError.textContent = `Unable to load Mars images. ${error.message || "Please try again."}`;
+  } finally {
+    marsLoading.textContent = "";
+    marsButton.disabled = false;
+  }
 });
 
 // 10. RANDOM DISCOVERY: random date within APOD's available range

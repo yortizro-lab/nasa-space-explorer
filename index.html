@@ -17,6 +17,7 @@
     <nav>
       <a href="#home">Home</a>
       <a href="#gallery">Explore</a>
+      <a href="#mars">Mars</a>
     </nav>
   </header>
 
@@ -54,6 +55,16 @@
 
       <div class="gallery" id="galleryContainer"></div>
     </section>
+    <section class="gallery-section" id="mars">
+      <h2>Mars Rover Images</h2>
+      <p>Explore Mars rover images and their descriptions from NASA's Image and Video Library.</p>
+      <div class="controls">
+        <button id="marsButton" type="button">Load Mars Images</button>
+      </div>
+      <p id="marsLoading" class="message" aria-live="polite"></p>
+      <p id="marsError" class="error" role="alert"></p>
+      <div class="gallery" id="marsGallery"></div>
+    </section>
   </main>
 
   <div
@@ -74,6 +85,7 @@
       >&times;</button>
       <img id="modalImage" src="" alt="NASA space discovery">
       <iframe id="modalVideo" title="NASA video" allowfullscreen hidden></iframe>
+      <p id="modalMediaError" hidden>Image unavailable. Use the link below to view the original discovery.</p>
       <h2 id="modalTitle"></h2>
       <p id="modalDate"></p>
       <p id="modalExplanation"></p>

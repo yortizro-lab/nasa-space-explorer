@@ -59,6 +59,18 @@ days. Near today, the range shifts backward to include nine days. If today's
 APOD is not yet available, the app shows the nine days ending yesterday and
 displays a notice. An incomplete API response is shown as an error.
 
+If the older APOD API returns NASA's logo instead of a discovery, the browser
+retrieves the matching dates from NASA Science's public APOD service instead,
+including the title, explanation, and image together. Image and video entries
+without usable media show a link to the original discovery.
+
+The Mars section loads NASA Image and Video Library search results about the
+Curiosity rover on demand. Each card uses the image and description from the
+same library record; the library date is not necessarily the date a photo was
+taken. This public library does not use a NASA API key. The former Mars Rover
+Photos API is unavailable, so these records use image links rather than its
+`img_src` field.
+
 ## Publish on Fly.io
 
 Fly.io runs the server and stores the NASA key as a secret. Its public `fly.dev`
