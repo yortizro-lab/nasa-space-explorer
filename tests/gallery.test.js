@@ -68,7 +68,7 @@ async function setup() {
   const context = vm.createContext({
     window: { location: { hostname: "example.github.io" } },
     document, HTMLElement: Element, DOMParser: TestDOMParser, URL, URLSearchParams, Date, Math, Set,
-    console: { error() {} },
+    console: { error() {}, warn() {} },
     async fetch(url) {
       const parsed = new URL(url);
       const params = Object.fromEntries(parsed.searchParams);
@@ -233,6 +233,60 @@ test("NASA logo responses are replaced with matching NASA Science APOD records",
   assert.equal(app.elements.get("modalLink").href, "https://science.nasa.gov/2020-01-01");
   assert.equal(app.elements.get("modalExplanation").textContent, "Explanation: Space");
   assert.equal(app.calls.length, 10);
+});
+
+test("NASA Science displays nine discoveries when the APOD API is rate-limited or unavailable", async () => {
+  const app = await setup();
+  for (const status of [429, 503, 403]) {
+    app.setHandler((params) => {
+      if (!params.scienceDate) return { status, data: { error: "APOD unavailable" } };
+      const date = `20${params.scienceDate.slice(0, 2)}-${params.scienceDate.slice(2, 4)}-${params.scienceDate.slice(4, 6)}`;
+      return { status: 200, data: {
+        date, title: `Title ${date}`, explanation: "Details",
+        media_type: "image", hdurl: `https://assets.science.nasa.gov/${date}.jpg`,
+      } };
+    });
+    await app.load("2020-01-01");
+    assert.equal(app.elements.get("galleryContainer").children.length, 9);
+    assert.equal(app.elements.get("errorMessage").textContent, "");
+    assert.equal(app.elements.get("loadingMessage").textContent, "");
+  }
+});
+
+test("NASA Science is used when the APOD request fails at the network layer", async () => {
+  const app = await setup();
+  app.setHandler((params) => {
+    if (!params.scienceDate) throw new Error("Network unavailable");
+    const date = `20${params.scienceDate.slice(0, 2)}-${params.scienceDate.slice(2, 4)}-${params.scienceDate.slice(4, 6)}`;
+    return { status: 200, data: { date, title: date, media_type: "image", hdurl: "https://example.com/image.jpg" } };
+  });
+  await app.load("2020-01-01");
+  assert.equal(app.elements.get("galleryContainer").children.length, 9);
+});
+
+test("unavailable today in NASA Science retries with nine previous days", async () => {
+  const app = await setup();
+  app.setHandler((params) => {
+    if (!params.scienceDate) return { status: 429, data: { error: "Rate limit" } };
+    const date = `20${params.scienceDate.slice(0, 2)}-${params.scienceDate.slice(2, 4)}-${params.scienceDate.slice(4, 6)}`;
+    if (date === app.today) return { status: 404, data: {} };
+    return { status: 200, data: { date, title: date, media_type: "image", hdurl: "https://example.com/image.jpg" } };
+  });
+  await app.load(app.today);
+  assert.equal(app.elements.get("galleryContainer").children.length, 9);
+  assert.match(app.elements.get("errorMessage").textContent, /not available yet/);
+});
+
+test("failure of both services is displayed instead of an empty gallery", async () => {
+  const app = await setup();
+  app.setHandler((params) => params.scienceDate
+    ? { status: 503, data: {} }
+    : { status: 429, data: { error: "Rate limit" } });
+  await app.load("2020-01-01");
+  assert.equal(app.elements.get("galleryContainer").children.length, 0);
+  assert.match(app.elements.get("errorMessage").textContent, /Both NASA discovery services failed/);
+  assert.equal(app.elements.get("loadingMessage").textContent, "");
+  assert.equal(app.elements.get("searchButton").disabled, false);
 });
 
 test("NASA Science video records keep the video, thumbnail and article together", async () => {

@@ -96,6 +96,21 @@ async function requestApod(params, direct) {
 }
 
 async function fetchApod(params) {
+  try {
+    return await fetchLegacyApod(params);
+  } catch (error) {
+    if (error.status === 400) throw error;
+    console.warn("APOD API unavailable; trying NASA Science:", error.message);
+    try {
+      return await fetchScienceDiscoveries(params.start_date, params.end_date);
+    } catch (fallbackError) {
+      if (fallbackError.status === 400) throw fallbackError;
+      throw new Error(`Both NASA discovery services failed. APOD: ${error.message}. NASA Science: ${fallbackError.message}`);
+    }
+  }
+}
+
+async function fetchLegacyApod(params) {
   let response;
   let data;
   try {
@@ -122,7 +137,7 @@ async function fetchApod(params) {
   }
   const entries = Array.isArray(data) ? data : [data];
   if (entries.some((entry) => isNasaLogo(entry.url) || isNasaLogo(entry.hdurl))) {
-    return fetchScienceDiscoveries(params.start_date, params.end_date);
+    throw new Error("NASA APOD returned its logo instead of the discovery.");
   }
   return entries;
 }
