@@ -109,8 +109,14 @@ test("dismissed and failed prompts give usable instructions", async () => {
 test("iOS and unsupported browsers show manual installation instructions", async () => {
   for (const device of [{ userAgent: "iPhone" }, { platform: "MacIntel", maxTouchPoints: 5 }]) {
     const app = setup(device);
+    assert.equal(app.button.textContent, "Install on Home Screen");
+    assert.equal(app.status.hidden, false);
+    assert.match(app.status.textContent, /Safari.*Share.*Add to Home Screen.*Edit Actions.*Open as Web App.*tap Add/);
     await app.button.click();
-    assert.match(app.status.textContent, /Safari.*Share.*Add to Home Screen/);
+    assert.match(app.status.textContent, /Safari.*Share.*Add to Home Screen.*Edit Actions/);
+    const installedApp = setup({ ...device, installed: true });
+    assert.equal(installedApp.button.hidden, true);
+    assert.equal(installedApp.status.hidden, true);
   }
   const desktop = setup();
   await desktop.button.click();
@@ -118,6 +124,10 @@ test("iOS and unsupported browsers show manual installation instructions", async
   const insecure = setup({ secure: false });
   await insecure.button.click();
   assert.match(insecure.status.textContent, /requires HTTPS or localhost/);
+  const insecureIphone = setup({ userAgent: "iPhone", secure: false });
+  assert.equal(insecureIphone.status.hidden, true);
+  await insecureIphone.button.click();
+  assert.match(insecureIphone.status.textContent, /requires HTTPS or localhost/);
 });
 
 test("the install button is hidden in standalone mode", () => {

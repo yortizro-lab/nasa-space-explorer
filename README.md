@@ -93,7 +93,10 @@ wait for them to load, then disconnect and reload the same site and date range.
 Open the site over HTTPS or localhost. When your browser offers a native install
 prompt, select **Install App** and follow the prompt. Otherwise, select
 **Install Options** for instructions. On iPhone or iPad, open the site in Safari,
-tap **Share**, then **Add to Home Screen**. On other browsers, look for
+tap **Share**, scroll down, and tap **Add to Home Screen**. If the option is
+missing, scroll to the bottom of the Share menu, tap **Edit Actions**, and add
+**Add to Home Screen**. Turn on **Open as Web App** if available, then tap
+**Add**. On other browsers, look for
 **Install app** or **Add to Home screen** in the browser menu. Browser support
 and install eligibility vary, and the native prompt may not appear immediately,
 after dismissal, or if the app is already installed. An installed app uses the

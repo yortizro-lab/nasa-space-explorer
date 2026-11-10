@@ -3,6 +3,13 @@ let installButton;
 let installStatus;
 let appInstalled = false;
 
+function isAppleMobile() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+const appleInstallInstructions = "On iPhone or iPad, open this page in Safari. Tap Share, scroll down and tap Add to Home Screen. If it is missing, scroll to the bottom, tap Edit Actions, and add Add to Home Screen. Turn on Open as Web App if available, then tap Add.";
+
 function isInstalled() {
   return appInstalled || window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 }
@@ -15,7 +22,7 @@ function showInstallMessage(message) {
 function updateInstallButton() {
   if (!installButton) return;
   installButton.hidden = isInstalled();
-  installButton.textContent = installPrompt ? "Install App" : "Install Options";
+  installButton.textContent = installPrompt ? "Install App" : isAppleMobile() ? "Install on Home Screen" : "Install Options";
 }
 
 window.addEventListener("beforeinstallprompt", (event) => {
@@ -37,15 +44,14 @@ function initializeInstall() {
   installStatus = document.getElementById("installStatus");
   updateInstallButton();
   if (appInstalled) showInstallMessage("Space Explorer has been installed.");
+  else if (isAppleMobile() && !isInstalled() && window.isSecureContext !== false) showInstallMessage(appleInstallInstructions);
 
   installButton.addEventListener("click", async () => {
     if (!installPrompt) {
-      const isAppleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
       showInstallMessage(window.isSecureContext === false
         ? "Installation requires HTTPS or localhost. Open the secure site and try again."
-        : isAppleMobile
-          ? "On iPhone or iPad, open this page in Safari, tap Share, then Add to Home Screen."
+        : isAppleMobile()
+          ? appleInstallInstructions
           : "The browser install prompt is not available yet. Open your browser menu and look for Install app or Add to Home screen; availability varies by browser.");
       return;
     }
