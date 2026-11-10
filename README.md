@@ -92,8 +92,10 @@ wait for them to load, then disconnect and reload the same site and date range.
 
 Open the site over HTTPS or localhost. When your browser offers a native install
 prompt, select **Install App** and follow the prompt. Otherwise, select
-**Install Options** for instructions. On iPhone or iPad, open the site in Safari,
-tap **Share**, scroll down, and tap **Add to Home Screen**. If the option is
+**Install Options** for instructions. On iPhone or iPad, select **Install on
+Home Screen** for a step-by-step guide. Open the site in Safari, tap **Share**,
+scroll down, and tap **Add to Home Screen**. iOS does not allow websites to
+open the installation prompt directly. If the option is
 missing, scroll to the bottom of the Share menu, tap **Edit Actions**, and add
 **Add to Home Screen**. Turn on **Open as Web App** if available, then tap
 **Add**. On other browsers, look for
@@ -167,7 +169,10 @@ keeps `.env` and other unneeded files out of the build context.
 The Fly-hosted site can send an opt-in push notification with the NASA
 Astronomy Picture of the Day title at approximately **14:00 UTC**. The welcome
 section has buttons to enable or turn off notifications for the current device.
-Permission is requested only when the visitor clicks enable. Browser support
+The separate **Allow Notifications** button requests browser permission without
+requiring a configured push server; granting permission alone does not schedule
+or send a notification. Daily reminders still require enabling the configured
+push service. Permission is requested only after a visitor clicks a button. Browser support
 varies; on iPhone/iPad, use a supported iOS version and add the app to the home
 screen first. GitHub Pages cannot send these notifications by itself.
 

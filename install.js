@@ -42,12 +42,16 @@ window.addEventListener("appinstalled", () => {
 function initializeInstall() {
   installButton = document.getElementById("installButton");
   installStatus = document.getElementById("installStatus");
+  const installDialog = document.getElementById("installDialog");
   updateInstallButton();
   if (appInstalled) showInstallMessage("Space Explorer has been installed.");
-  else if (isAppleMobile() && !isInstalled() && window.isSecureContext !== false) showInstallMessage(appleInstallInstructions);
 
   installButton.addEventListener("click", async () => {
     if (!installPrompt) {
+      if (isAppleMobile() && window.isSecureContext !== false && installDialog && typeof installDialog.showModal === "function") {
+        installDialog.showModal();
+        return;
+      }
       showInstallMessage(window.isSecureContext === false
         ? "Installation requires HTTPS or localhost. Open the secure site and try again."
         : isAppleMobile()

@@ -115,6 +115,44 @@ nav a:hover {
   color: #c5d3e8;
 }
 
+.install-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(90%, 500px);
+  max-height: 85vh;
+  margin: auto;
+  padding: 25px;
+  border: 1px solid #27395f;
+  border-radius: 15px;
+  background: #111a32;
+  color: white;
+}
+
+.install-dialog:not([open]) {
+  display: none;
+}
+
+.install-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.install-dialog h2 {
+  color: #65c9ff;
+}
+
+.install-dialog p,
+.install-dialog ol {
+  margin: 12px 0;
+}
+
+.install-dialog ol {
+  padding-left: 24px;
+}
+
+.install-dialog .install-button {
+  margin: 8px 0 0;
+}
+
 .notification-intro {
   max-width: 650px;
   margin: 32px auto 0;

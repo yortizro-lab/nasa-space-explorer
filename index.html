@@ -42,7 +42,10 @@
       <p id="installStatus" class="install-status" role="status" hidden></p>
       <div class="notification-intro">
         <h2>Welcome, space explorer!</h2>
-        <p>Get a daily reminder about NASA's Astronomy Picture of the Day. Notifications are optional and can be turned off here.</p>
+        <p>Allow notifications for this site. Permission alone does not schedule or send notifications.</p>
+        <button id="requestNotificationPermission" class="install-button" type="button" aria-describedby="notificationPermissionStatus" disabled>Allow Notifications</button>
+        <p id="notificationPermissionStatus" class="install-status" role="status">Checking notification permission...</p>
+        <p>Get a daily reminder about NASA's Astronomy Picture of the Day. Daily reminders are optional and can be turned off here.</p>
         <button id="enableNotifications" class="install-button" type="button" disabled>Enable Daily Notifications</button>
         <button id="disableNotifications" class="install-button" type="button" hidden>Turn Off Notifications</button>
         <p id="notificationStatus" class="install-status" role="status">Checking notification availability...</p>
@@ -84,6 +87,20 @@
     </section>
   </main>
 
+  <dialog id="installDialog" class="install-dialog" aria-labelledby="installDialogTitle">
+    <h2 id="installDialogTitle">Install on your Home Screen</h2>
+    <p>iPhone and iPad require you to add this app from Safari:</p>
+    <ol>
+      <li>Open this page in Safari and tap the <strong>Share</strong> button (square with an upward arrow).</li>
+      <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+      <li>Turn on <strong>Open as Web App</strong> if available, then tap <strong>Add</strong>.</li>
+    </ol>
+    <p>If Add to Home Screen is missing, tap <strong>Edit Actions</strong> at the bottom of the Share menu and add it.</p>
+    <form method="dialog">
+      <button class="install-button" type="submit" autofocus>Got it</button>
+    </form>
+  </dialog>
+
   <div
     class="modal"
     id="imageModal"
@@ -117,6 +134,52 @@
     <p>Discover the universe, one day at a time. 🌌</p>
   </footer>
 
+  <!-- Keep the permission control with its markup for independently cached scripts. -->
+  <script>
+    (() => {
+      const button = document.getElementById("requestNotificationPermission");
+      const status = document.getElementById("notificationPermissionStatus");
+      const dailyButton = document.getElementById("enableNotifications");
+      const dailyStatus = document.getElementById("notificationStatus");
+
+      function updatePermission() {
+        button.disabled = true;
+        if (window.isSecureContext === false) {
+          status.textContent = "Notification permission requires HTTPS or localhost.";
+        } else if (!("Notification" in window) || typeof window.Notification.requestPermission !== "function") {
+          status.textContent = "Notification permission is not supported here. On iPhone or iPad, add the app to your home screen and open it there.";
+        } else if (window.Notification.permission === "granted") {
+          status.textContent = "Notification permission is allowed. This alone does not enable daily reminders.";
+        } else if (window.Notification.permission === "denied") {
+          status.textContent = "Notifications are blocked. Change your browser or device settings to allow them, then reload this page.";
+        } else {
+          button.disabled = false;
+          status.textContent = "You can allow notifications when you are ready.";
+        }
+      }
+
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          const permission = await window.Notification.requestPermission();
+          updatePermission();
+          if (permission === "default") {
+            status.textContent = "Notification permission was not granted. You can try again.";
+          } else if (permission === "denied" && !dailyButton.hidden && !dailyButton.disabled) {
+            dailyButton.disabled = true;
+            dailyStatus.textContent = "Notifications are blocked. Change your browser or device settings to enable them.";
+          }
+        } catch (error) {
+          console.error("Could not request notification permission:", error);
+          updatePermission();
+          status.textContent = "Could not request notification permission. Check your browser settings and try again.";
+        }
+      });
+
+      window.updateNotificationPermission = updatePermission;
+      updatePermission();
+    })();
+  </script>
   <script src="notifications.js"></script>
   <script src="script.js"></script>
 </body>

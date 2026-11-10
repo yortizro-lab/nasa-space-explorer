@@ -7,7 +7,7 @@ const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "install.js"), "utf8");
 
-function setup({ installed = false, userAgent = "", platform = "", maxTouchPoints = 0, loading = false, secure = true } = {}) {
+function setup({ installed = false, userAgent = "", platform = "", maxTouchPoints = 0, loading = false, secure = true, supportsDialog = true, hasDialog = true } = {}) {
   const windowListeners = {};
   const documentListeners = {};
   const button = {
@@ -15,6 +15,7 @@ function setup({ installed = false, userAgent = "", platform = "", maxTouchPoint
     addEventListener(name, callback) { this[name] = callback; },
   };
   const status = { hidden: true, textContent: "" };
+  const dialog = !hasDialog ? null : supportsDialog ? { open: false, showModal() { this.open = true; } } : {};
   const window = {
     isSecureContext: secure,
     matchMedia() { return { matches: installed }; },
@@ -26,11 +27,11 @@ function setup({ installed = false, userAgent = "", platform = "", maxTouchPoint
     document: {
       readyState: loading ? "loading" : "complete",
       addEventListener(name, callback) { documentListeners[name] = callback; },
-      getElementById(id) { return id === "installButton" ? button : status; },
+      getElementById(id) { return { installButton: button, installStatus: status, installDialog: dialog }[id]; },
     },
     console: { error() {} },
   });
-  return { button, status, windowListeners, documentListeners };
+  return { button, status, dialog, windowListeners, documentListeners };
 }
 
 test("install button opens the browser prompt and handles acceptance", async () => {
@@ -106,14 +107,19 @@ test("dismissed and failed prompts give usable instructions", async () => {
   }
 });
 
-test("iOS and unsupported browsers show manual installation instructions", async () => {
+test("iOS install button opens the custom guide or shows a fallback", async () => {
   for (const device of [{ userAgent: "iPhone" }, { platform: "MacIntel", maxTouchPoints: 5 }]) {
     const app = setup(device);
     assert.equal(app.button.textContent, "Install on Home Screen");
-    assert.equal(app.status.hidden, false);
-    assert.match(app.status.textContent, /Safari.*Share.*Add to Home Screen.*Edit Actions.*Open as Web App.*tap Add/);
+    assert.equal(app.status.hidden, true);
     await app.button.click();
-    assert.match(app.status.textContent, /Safari.*Share.*Add to Home Screen.*Edit Actions/);
+    assert.equal(app.dialog.open, true);
+    for (const option of [{ supportsDialog: false }, { hasDialog: false }]) {
+      const fallback = setup({ ...device, ...option });
+      await fallback.button.click();
+      assert.equal(fallback.status.hidden, false);
+      assert.match(fallback.status.textContent, /Safari.*Share.*Add to Home Screen.*Edit Actions.*Open as Web App.*tap Add/);
+    }
     const installedApp = setup({ ...device, installed: true });
     assert.equal(installedApp.button.hidden, true);
     assert.equal(installedApp.status.hidden, true);
@@ -128,6 +134,7 @@ test("iOS and unsupported browsers show manual installation instructions", async
   assert.equal(insecureIphone.status.hidden, true);
   await insecureIphone.button.click();
   assert.match(insecureIphone.status.textContent, /requires HTTPS or localhost/);
+  assert.equal(insecureIphone.dialog.open, false);
 });
 
 test("the install button is hidden in standalone mode", () => {
@@ -157,4 +164,7 @@ test("install listener loads in the document head before page scripts", () => {
   assert.match(html, /<link rel="apple-touch-icon" sizes="192x192" type="image\/png" href="imagenes\/icon-192\.png">/);
   assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
   assert.match(html, /<meta name="apple-mobile-web-app-title" content="Space Explorer">/);
+  assert.match(html, /<dialog id="installDialog"[^>]*aria-labelledby="installDialogTitle">/);
+  assert.match(html, /<form method="dialog">[\s\S]*<button[^>]*>Got it<\/button>/);
+  assert.match(html, /Share[\s\S]*Add to Home Screen[\s\S]*Open as Web App[\s\S]*Add/);
 });

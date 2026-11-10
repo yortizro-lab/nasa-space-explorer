@@ -65,6 +65,7 @@ enableNotifications.addEventListener("click", async () => {
   let subscription;
   try {
     const permission = await Notification.requestPermission();
+    if (typeof window.updateNotificationPermission === "function") window.updateNotificationPermission();
     if (permission !== "granted") {
       showNotificationStatus("Notifications were not allowed. You can change this in your browser settings.");
       return;
@@ -88,7 +89,7 @@ enableNotifications.addEventListener("click", async () => {
     }
     showNotificationStatus("Could not enable notifications. Check your connection and try again.");
   } finally {
-    enableNotifications.disabled = false;
+    enableNotifications.disabled = Notification.permission === "denied";
   }
 });
 
