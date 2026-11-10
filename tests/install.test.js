@@ -154,4 +154,7 @@ test("install listener loads in the document head before page scripts", () => {
   assert.match(html, /<head>[\s\S]*<script src="install\.js"><\/script>[\s\S]*<\/head>/);
   assert.equal((html.match(/<script src="install\.js"><\/script>/g) || []).length, 1);
   assert.match(html, /<link rel="manifest" href="manifest\.json">/);
+  assert.match(html, /<link rel="apple-touch-icon" sizes="192x192" type="image\/png" href="imagenes\/icon-192\.png">/);
+  assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
+  assert.match(html, /<meta name="apple-mobile-web-app-title" content="Space Explorer">/);
 });
