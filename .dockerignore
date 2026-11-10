@@ -1,8 +1,16 @@
 *
 !Dockerfile
 !server.js
+!push-service.js
+!docker-entrypoint.sh
+!package.json
+!package-lock.json
 !index.html
 !script.js
+!install.js
+!notifications.js
+!service-worker.js
 !style.css
+!manifest.json
 !imagenes/
 !imagenes/**

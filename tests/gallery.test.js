@@ -52,7 +52,7 @@ function entries(start, end) {
   return result;
 }
 
-async function setup() {
+async function setup(navigator) {
   const elements = new Map();
   const calls = [];
   let handler = (params) => ({ status: 200, data: entries(params.start_date, params.end_date) });
@@ -67,7 +67,7 @@ async function setup() {
   };
   const context = vm.createContext({
     window: { location: { hostname: "example.github.io" } },
-    document, HTMLElement: Element, DOMParser: TestDOMParser, URL, URLSearchParams, Date, Math, Set,
+    document, navigator, HTMLElement: Element, DOMParser: TestDOMParser, URL, URLSearchParams, Date, Math, Set,
     console: { error() {}, warn() {} },
     async fetch(url) {
       const parsed = new URL(url);
@@ -275,6 +275,19 @@ test("unavailable today in NASA Science retries with nine previous days", async 
   await app.load(app.today);
   assert.equal(app.elements.get("galleryContainer").children.length, 9);
   assert.match(app.elements.get("errorMessage").textContent, /not available yet/);
+});
+
+test("offline startup retries the prior nine saved days when today's discovery is not cached", async () => {
+  const app = await setup({ onLine: false });
+  app.setHandler((params) => {
+    if (!params.scienceDate) return { status: 429, data: { error: "Rate limit" } };
+    const date = `20${params.scienceDate.slice(0, 2)}-${params.scienceDate.slice(2, 4)}-${params.scienceDate.slice(4, 6)}`;
+    if (date === app.today) throw new Error("offline");
+    return { status: 200, data: { date, title: date, media_type: "image", hdurl: "https://example.com/image.jpg" } };
+  });
+  await app.load(app.today);
+  assert.equal(app.elements.get("galleryContainer").children.length, 9);
+  assert.match(app.elements.get("errorMessage").textContent, /not available offline/);
 });
 
 test("failure of both services is displayed instead of an empty gallery", async () => {

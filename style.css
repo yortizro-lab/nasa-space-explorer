@@ -74,6 +74,7 @@ nav a:hover {
 }
 
 .explore-button,
+.install-button,
 .controls button {
   display: inline-block;
   background: #168bd2;
@@ -87,13 +88,49 @@ nav a:hover {
 }
 
 .explore-button:hover,
+.install-button:hover:not(:disabled),
 .controls button:hover:not(:disabled) {
   background: #45b8ff;
 }
 
+.install-button:disabled,
 .controls button:disabled {
   opacity: 0.6;
   cursor: wait;
+}
+
+.install-button {
+  margin-left: 10px;
+}
+
+.install-button[hidden],
+.notification-intro [hidden],
+.install-status[hidden] {
+  display: none;
+}
+
+.install-status {
+  max-width: 600px;
+  margin: 18px auto 0;
+  color: #c5d3e8;
+}
+
+.notification-intro {
+  max-width: 650px;
+  margin: 32px auto 0;
+}
+
+.notification-intro h2 {
+  font-size: 22px;
+}
+
+.notification-intro p {
+  margin: 10px 0;
+  color: #c5d3e8;
+}
+
+.notification-intro .install-button {
+  margin: 8px 4px 0;
 }
 
 .gallery-section {

@@ -11,7 +11,15 @@ const root = path.join(__dirname, "..");
 async function startServer(t, key) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nasa-server-test-"));
   fs.copyFileSync(path.join(root, "server.js"), path.join(dir, "server.js"));
+  fs.copyFileSync(path.join(root, "push-service.js"), path.join(dir, "push-service.js"));
   fs.copyFileSync(path.join(root, "index.html"), path.join(dir, "index.html"));
+  fs.copyFileSync(path.join(root, "manifest.json"), path.join(dir, "manifest.json"));
+  fs.copyFileSync(path.join(root, "service-worker.js"), path.join(dir, "service-worker.js"));
+  fs.copyFileSync(path.join(root, "install.js"), path.join(dir, "install.js"));
+  fs.mkdirSync(path.join(dir, "imagenes"));
+  for (const size of [192, 512]) {
+    fs.copyFileSync(path.join(root, "imagenes", `icon-${size}.png`), path.join(dir, "imagenes", `icon-${size}.png`));
+  }
   const env = { ...process.env, NASA_API_KEY: key, PORT: "0" };
   delete env.NODE_OPTIONS;
   const child = spawn(process.execPath, [
@@ -43,6 +51,22 @@ test("server starts without a key and reports a clear API error", async (t) => {
   const page = await fetch(base);
   assert.equal(page.status, 200);
   assert.match(await page.text(), /NASA Space Explorer/);
+  const manifest = await fetch(`${base}/manifest.json`);
+  assert.equal(manifest.status, 200);
+  assert.match(manifest.headers.get("content-type"), /^application\/manifest\+json/);
+  assert.equal((await manifest.json()).theme_color, "#0b3d91");
+  const worker = await fetch(`${base}/service-worker.js`);
+  assert.equal(worker.status, 200);
+  assert.match(worker.headers.get("content-type"), /^text\/javascript/);
+  assert.equal((await fetch(`${base}/install.js`)).status, 200);
+  for (const size of [192, 512]) {
+    const icon = await fetch(`${base}/imagenes/icon-${size}.png`);
+    assert.equal(icon.status, 200);
+    assert.match(icon.headers.get("content-type"), /^image\/png/);
+    const image = Buffer.from(await icon.arrayBuffer());
+    assert.equal(image.readUInt32BE(16), size);
+    assert.equal(image.readUInt32BE(20), size);
+  }
   const response = await fetch(`${base}/api/apod?date=2000-01-01`);
   assert.equal(response.status, 503);
   assert.match((await response.json()).error, /not configured/);

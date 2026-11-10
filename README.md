@@ -72,6 +72,31 @@ taken. This public library does not use a NASA API key. The former Mars Rover
 Photos API is unavailable, so these records use image links rather than its
 `img_src` field.
 
+## Offline access
+
+After you visit the site online, its service worker saves the website files and
+previously requested NASA data and NASA-hosted images. When a network request
+fails, saved responses may be shown with a notice that they can be out of date.
+Only previously requested data and images are available offline; videos,
+external images, and uncached dates still require a connection. Loading images
+and data online first does not guarantee permanent storage: browsers can remove
+cached content. Data and image caches are each limited to 100 entries.
+
+Offline access requires HTTPS (or localhost) and a browser that supports service
+workers. The first visit must be online. After the worker installs, reload the
+page online so the worker can save the discovery requests. Updates to the worker
+take effect after older open tabs close. To test, visit some discoveries online,
+wait for them to load, then disconnect and reload the same site and date range.
+
+## Install on your home screen
+
+Open the site over HTTPS or localhost and select **Install App**. On supported
+browsers, follow the install prompt. On iPhone or iPad, open the site in Safari,
+tap **Share**, then **Add to Home Screen**. If the prompt is unavailable on
+another browser, use its menu to look for **Install app** or **Add to Home
+screen**. Availability depends on your browser and device. An installed app
+uses the same offline cache described above.
+
 ## Publish on Fly.io
 
 Fly.io runs the server and stores the NASA key as a secret. Its public `fly.dev`
@@ -96,7 +121,7 @@ before creating or deploying an app.
    ```
 
    Follow the prompts to choose an app name, organization, and region. No
-   database is required. Review the machine size and costs. Fly generates a
+   Review the machine size and costs. Fly generates a
    `fly.toml` file; confirm its HTTP service `internal_port` is `3000`, matching
    the Dockerfile. If a `PORT` environment variable is set, it must match
    `internal_port`. The app name must be unique.
@@ -114,7 +139,10 @@ before creating or deploying an app.
    deploying. Fly encrypts the secret and supplies it to the server at runtime.
    Do not put the key in `fly.toml` or the Dockerfile. `fly secrets list` shows
    the names of configured secrets, not their values.
-4. Deploy and open the app:
+4. If using the daily notifications feature, configure the volume and secrets
+   described in [Daily notifications](#daily-notifications) before deploying.
+   The configured volume is required by `fly.toml`.
+5. Deploy and open the app:
 
    ```bash
    fly deploy --ha=false
@@ -128,6 +156,54 @@ before creating or deploying an app.
 
 The Dockerfile copies only the files needed to run the site. `.dockerignore`
 keeps `.env` and other unneeded files out of the build context.
+
+## Daily notifications
+
+The Fly-hosted site can send an opt-in push notification with the NASA
+Astronomy Picture of the Day title at approximately **14:00 UTC**. The welcome
+section has buttons to enable or turn off notifications for the current device.
+Permission is requested only when the visitor clicks enable. Browser support
+varies; on iPhone/iPad, use a supported iOS version and add the app to the home
+screen first. GitHub Pages cannot send these notifications by itself.
+
+Push subscriptions contain browser push endpoints and keys. They are stored on
+the Fly volume until the visitor turns notifications off or the push service
+reports the subscription expired. Volume snapshots and backups may retain old
+subscriptions. The configuration below uses a **single Fly machine** and volume;
+do not scale it to multiple machines without shared storage and coordination.
+Provisioning and storage may incur charges. Back up the volume if you need to
+preserve subscriptions.
+
+1. Install dependencies locally with `npm ci`. Generate VAPID keys locally
+   with `npx web-push generate-vapid-keys`. Treat the private key as a secret.
+2. Before deploying, create the volume in the Fly app's region:
+
+   ```bash
+   fly volumes create push_data --region lax --size 1 -a nasa-space-explorer
+   ```
+
+3. Configure Fly secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+   `VAPID_SUBJECT`, and `PUSH_ADMIN_TOKEN`. `VAPID_SUBJECT` must be a `mailto:`
+   address or an HTTPS contact URL. Generate a long random admin token (for
+   example, `openssl rand -hex 32`). Use Fly's secret management UI or
+   `fly secrets import --stage` with secure input; never commit or post secret
+   values. Keep the VAPID key pair stable or existing subscriptions must opt in
+   again.
+4. Add the **same** `PUSH_ADMIN_TOKEN` as a GitHub Actions repository secret
+   under **Settings → Secrets and variables → Actions**. The workflow sends an
+   authenticated request to the Fly app daily. GitHub may delay scheduled
+   runs; the workflow can also be started manually from the Actions tab. It
+   sends each stored subscription at most once per UTC date on successful
+   delivery; failed deliveries can be retried by running the workflow again.
+5. Deploy with `fly deploy --ha=false`, then verify the app and the workflow.
+   If today's APOD is not yet available, the workflow reports a failure rather
+   than sending incorrect information; retry after publication. If the Fly
+   secrets or push storage are misconfigured, the rest of the website still
+   works but push is disabled; check the server logs.
+
+Avoid entering private keys in browser code or `fly.toml`. On local development,
+push can be configured through the same environment variables with
+`PUSH_DATA_DIR=.push-data`; the directory is git-ignored.
 
 ## GitHub Pages
 

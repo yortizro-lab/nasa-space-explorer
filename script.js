@@ -35,6 +35,33 @@ const modalDate = document.getElementById("modalDate");
 const modalExplanation = document.getElementById("modalExplanation");
 const modalLink = document.getElementById("modalLink");
 const closeModal = document.getElementById("closeModal");
+const offlineStatus = document.getElementById("offlineStatus");
+
+if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data?.type === "CACHED_CONTENT") {
+      offlineStatus.textContent = "Connection unavailable: showing saved content that may be out of date.";
+      offlineStatus.hidden = false;
+    }
+  });
+  navigator.serviceWorker.register("service-worker.js").catch((error) => {
+    console.error("Offline support could not be enabled:", error);
+    offlineStatus.textContent = "Offline support is unavailable in this browser.";
+    offlineStatus.hidden = false;
+  });
+}
+
+if (typeof navigator !== "undefined" && typeof window.addEventListener === "function") {
+  function updateConnectionStatus() {
+    offlineStatus.textContent = navigator.onLine
+      ? ""
+      : "You are offline. Previously saved discoveries and images may be available.";
+    offlineStatus.hidden = navigator.onLine;
+  }
+  window.addEventListener("online", updateConnectionStatus);
+  window.addEventListener("offline", updateConnectionStatus);
+  updateConnectionStatus();
+}
 
 let spaceDiscoveries = [];
 let latestRequestId = 0;
@@ -162,7 +189,17 @@ async function fetchScienceDiscoveries(startDate, endDate) {
     dates.push(toDateString(time));
   }
   return Promise.all(dates.map(async (date) => {
-    const response = await fetch(`${NASA_SCIENCE_APOD_URL}/${date.slice(2).replace(/-/g, "")}`);
+    let response;
+    try {
+      response = await fetch(`${NASA_SCIENCE_APOD_URL}/${date.slice(2).replace(/-/g, "")}`);
+    } catch (error) {
+      if (date === todayString && typeof navigator !== "undefined" && !navigator.onLine) {
+        const offlineError = new Error("Today's discovery is not available offline.");
+        offlineError.status = 400;
+        throw offlineError;
+      }
+      throw error;
+    }
     if (!response.ok) {
       const error = new Error(`NASA's current APOD service could not load ${date} (HTTP ${response.status}).`);
       error.status = response.status === 404 && date === todayString ? 400 : response.status;
@@ -249,7 +286,9 @@ async function loadDiscoveries(startDate, focusDate, loadingText) {
     displayDiscoveries();
     loadingMessage.textContent = "";
     if (focusDate > endDate) {
-      errorMessage.textContent = `The discovery for ${focusDate} is not available yet. Showing the latest nine available days.`;
+      errorMessage.textContent = typeof navigator !== "undefined" && !navigator.onLine
+        ? `The discovery for ${focusDate} is not available offline. Showing nine saved days.`
+        : `The discovery for ${focusDate} is not available yet. Showing the latest nine available days.`;
     }
   } catch (error) {
     console.error("NASA API Error:", error);
@@ -571,5 +610,13 @@ randomButton.addEventListener("click", function () {
   loadDiscoveries(randomDate, randomDate, "🎲 Finding a random discovery...");
 });
 
-// 11. START: today's picture plus the 8 days before it
-loadDiscoveries(toDateString(toMs(todayString) - 8 * DAY_MS), todayString);
+// 11. START: show a notification's selected date, or today's latest range.
+const requestedDate = new URLSearchParams(window.location.search || "").get("date");
+if (requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) &&
+    requestedDate >= APOD_FIRST_DATE && requestedDate <= todayString &&
+    Number.isFinite(toMs(requestedDate)) && toDateString(toMs(requestedDate)) === requestedDate) {
+  startDateInput.value = requestedDate;
+  loadDiscoveries(requestedDate, requestedDate);
+} else {
+  loadDiscoveries(toDateString(toMs(todayString) - 8 * DAY_MS), todayString);
+}

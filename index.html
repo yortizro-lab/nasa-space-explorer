@@ -9,6 +9,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚀%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="imagenes/icon-192.png">
   <meta name="theme-color" content="#0b3d91">
 </head>
 
@@ -24,6 +25,7 @@
   </header>
 
   <main>
+    <p id="offlineStatus" class="message" role="status" hidden></p>
     <section class="hero" id="home">
       <p class="subtitle">DISCOVER THE UNIVERSE</p>
       <h1>Explore Beyond<br>Our World</h1>
@@ -32,6 +34,15 @@
         wonders through real NASA photography.
       </p>
       <a href="#gallery" class="explore-button">Start Exploring ✨</a>
+      <button id="installButton" class="install-button" type="button" aria-describedby="installStatus">Install App</button>
+      <p id="installStatus" class="install-status" role="status" hidden></p>
+      <div class="notification-intro">
+        <h2>Welcome, space explorer!</h2>
+        <p>Get a daily reminder about NASA's Astronomy Picture of the Day. Notifications are optional and can be turned off here.</p>
+        <button id="enableNotifications" class="install-button" type="button" disabled>Enable Daily Notifications</button>
+        <button id="disableNotifications" class="install-button" type="button" hidden>Turn Off Notifications</button>
+        <p id="notificationStatus" class="install-status" role="status">Checking notification availability...</p>
+      </div>
     </section>
 
     <section class="gallery-section" id="gallery">
@@ -102,6 +113,8 @@
     <p>Discover the universe, one day at a time. 🌌</p>
   </footer>
 
+  <script src="install.js"></script>
+  <script src="notifications.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

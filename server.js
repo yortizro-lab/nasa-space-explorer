@@ -3,6 +3,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { createPushService } = require("./push-service");
 
 const ENV_FILE = path.join(__dirname, ".env");
 if (fs.existsSync(ENV_FILE)) {
@@ -16,6 +17,12 @@ if (fs.existsSync(ENV_FILE)) {
 
 const PORT = process.env.PORT || 3000;
 const API_KEY = (process.env.NASA_API_KEY || "").trim();
+let pushService;
+try {
+  pushService = createPushService(process.env);
+} catch (error) {
+  console.error(`Push notifications disabled: configuration or storage error (${error.name}).`);
+}
 if (!API_KEY) {
   console.error("NASA_API_KEY is missing. The site will start, but APOD requests will be unavailable.");
 }
@@ -26,10 +33,11 @@ const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".json": "application/manifest+json; charset=utf-8",
   ".jpg": "image/jpeg",
   ".png": "image/png",
 };
-const PUBLIC_FILES = new Set(["index.html", "style.css", "script.js"]);
+const PUBLIC_FILES = new Set(["index.html", "manifest.json", "style.css", "script.js", "install.js", "notifications.js", "service-worker.js"]);
 
 async function proxyApod(url, res) {
   if (!API_KEY) {
@@ -72,9 +80,18 @@ function send(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
-http.createServer((req, res) => {
+http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (url.pathname === "/api/apod") return proxyApod(url, res);
+  if (url.pathname.startsWith("/api/push/")) {
+    if (!pushService) return send(res, 503, { error: "Push notifications are not configured on this server." });
+    try {
+      return await pushService.handle(req, res, url.pathname, send);
+    } catch (error) {
+      console.error("Push service error:", error.message);
+      return send(res, 500, { error: "Push notification service failed." });
+    }
+  }
 
   let rel;
   try {

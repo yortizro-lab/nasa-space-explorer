@@ -1,0 +1,24 @@
+name: Send daily APOD notifications
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+permissions: {}
+concurrency:
+  group: daily-apod-push
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notifications
+        env:
+          PUSH_ADMIN_TOKEN: ${{ secrets.PUSH_ADMIN_TOKEN }}
+        run: |
+          test -n "$PUSH_ADMIN_TOKEN" || { echo "PUSH_ADMIN_TOKEN is not configured"; exit 1; }
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -X POST -H "Authorization: Bearer $PUSH_ADMIN_TOKEN" \
+            https://nasa-space-explorer.fly.dev/api/push/send

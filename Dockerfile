@@ -4,9 +4,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-COPY server.js index.html script.js style.css ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY server.js push-service.js docker-entrypoint.sh index.html script.js install.js notifications.js service-worker.js style.css manifest.json ./
 COPY imagenes/ ./imagenes/
 
-USER node
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["sh", "/app/docker-entrypoint.sh"]

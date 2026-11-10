@@ -27,8 +27,8 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p dist/imagenes
-          cp index.html script.js style.css dist/
-          cp imagenes/galaxy.jpg dist/imagenes/
+          cp index.html manifest.json script.js install.js notifications.js service-worker.js style.css dist/
+          cp imagenes/galaxy.jpg imagenes/icon-192.png imagenes/icon-512.png dist/imagenes/
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

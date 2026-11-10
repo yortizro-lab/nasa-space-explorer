@@ -7,6 +7,14 @@ app = 'nasa-space-explorer'
 primary_region = 'lax'
 
 [build]
+
+[env]
+  PUSH_DATA_DIR = '/data/push'
+
+[[mounts]]
+  source = 'push_data'
+  destination = '/data'
+
 [http_service]
   internal_port = 3000
   force_https = true
