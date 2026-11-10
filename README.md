@@ -90,12 +90,14 @@ wait for them to load, then disconnect and reload the same site and date range.
 
 ## Install on your home screen
 
-Open the site over HTTPS or localhost and select **Install App**. On supported
-browsers, follow the install prompt. On iPhone or iPad, open the site in Safari,
-tap **Share**, then **Add to Home Screen**. If the prompt is unavailable on
-another browser, use its menu to look for **Install app** or **Add to Home
-screen**. Availability depends on your browser and device. An installed app
-uses the same offline cache described above.
+Open the site over HTTPS or localhost. When your browser offers a native install
+prompt, select **Install App** and follow the prompt. Otherwise, select
+**Install Options** for instructions. On iPhone or iPad, open the site in Safari,
+tap **Share**, then **Add to Home Screen**. On other browsers, look for
+**Install app** or **Add to Home screen** in the browser menu. Browser support
+and install eligibility vary, and the native prompt may not appear immediately,
+after dismissal, or if the app is already installed. An installed app uses the
+same offline cache described above.
 
 ## Publish on Fly.io
 

@@ -1,6 +1,6 @@
 const CACHE_PREFIX = "nasa-space-explorer-";
 const CACHE_VERSION = "v1";
-const SHELL_CACHE = `${CACHE_PREFIX}shell-v3`;
+const SHELL_CACHE = `${CACHE_PREFIX}shell-v4`;
 const DATA_CACHE = `${CACHE_PREFIX}data-${CACHE_VERSION}`;
 const IMAGE_CACHE = `${CACHE_PREFIX}images-${CACHE_VERSION}`;
 const CURRENT_CACHES = [SHELL_CACHE, DATA_CACHE, IMAGE_CACHE];

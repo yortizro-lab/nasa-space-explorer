@@ -7,28 +7,35 @@ const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "install.js"), "utf8");
 
-function setup({ installed = false, userAgent = "", platform = "", maxTouchPoints = 0 } = {}) {
+function setup({ installed = false, userAgent = "", platform = "", maxTouchPoints = 0, loading = false, secure = true } = {}) {
   const windowListeners = {};
+  const documentListeners = {};
   const button = {
-    hidden: false, disabled: false,
+    hidden: false, disabled: false, textContent: "",
     addEventListener(name, callback) { this[name] = callback; },
   };
   const status = { hidden: true, textContent: "" };
   const window = {
+    isSecureContext: secure,
     matchMedia() { return { matches: installed }; },
     addEventListener(name, callback) { windowListeners[name] = callback; },
   };
   vm.runInNewContext(source, {
     window,
     navigator: { userAgent, platform, maxTouchPoints },
-    document: { getElementById(id) { return id === "installButton" ? button : status; } },
+    document: {
+      readyState: loading ? "loading" : "complete",
+      addEventListener(name, callback) { documentListeners[name] = callback; },
+      getElementById(id) { return id === "installButton" ? button : status; },
+    },
     console: { error() {} },
   });
-  return { button, status, windowListeners };
+  return { button, status, windowListeners, documentListeners };
 }
 
 test("install button opens the browser prompt and handles acceptance", async () => {
   const app = setup();
+  assert.equal(app.button.textContent, "Install Options");
   let prevented = false;
   let prompted = 0;
   app.windowListeners.beforeinstallprompt({
@@ -36,6 +43,7 @@ test("install button opens the browser prompt and handles acceptance", async () 
     async prompt() { prompted++; },
     userChoice: Promise.resolve({ outcome: "accepted" }),
   });
+  assert.equal(app.button.textContent, "Install App");
   await app.button.click();
   assert.equal(prevented, true);
   assert.equal(prompted, 1);
@@ -44,6 +52,44 @@ test("install button opens the browser prompt and handles acceptance", async () 
   app.windowListeners.appinstalled();
   assert.equal(app.button.hidden, true);
   assert.match(app.status.textContent, /installed/);
+});
+
+test("captures the install prompt before the page finishes loading", async () => {
+  const app = setup({ loading: true });
+  let prompted = 0;
+  app.windowListeners.beforeinstallprompt({
+    preventDefault() {},
+    async prompt() { prompted++; },
+    userChoice: Promise.resolve({ outcome: "accepted" }),
+  });
+  app.documentListeners.DOMContentLoaded();
+  assert.equal(app.button.textContent, "Install App");
+  await app.button.click();
+  assert.equal(prompted, 1);
+});
+
+test("installation event is not overwritten by a pending prompt result", async () => {
+  const app = setup();
+  let resolveChoice;
+  app.windowListeners.beforeinstallprompt({
+    preventDefault() {},
+    async prompt() {},
+    userChoice: new Promise((resolve) => { resolveChoice = resolve; }),
+  });
+  const pending = app.button.click();
+  app.windowListeners.appinstalled();
+  resolveChoice({ outcome: "accepted" });
+  await pending;
+  assert.equal(app.button.hidden, true);
+  assert.match(app.status.textContent, /has been installed/);
+});
+
+test("installation before page initialization is reflected in the UI", () => {
+  const app = setup({ loading: true });
+  app.windowListeners.appinstalled();
+  app.documentListeners.DOMContentLoaded();
+  assert.equal(app.button.hidden, true);
+  assert.match(app.status.textContent, /has been installed/);
 });
 
 test("dismissed and failed prompts give usable instructions", async () => {
@@ -69,6 +115,9 @@ test("iOS and unsupported browsers show manual installation instructions", async
   const desktop = setup();
   await desktop.button.click();
   assert.match(desktop.status.textContent, /browser menu/);
+  const insecure = setup({ secure: false });
+  await insecure.button.click();
+  assert.match(insecure.status.textContent, /requires HTTPS or localhost/);
 });
 
 test("the install button is hidden in standalone mode", () => {
@@ -78,6 +127,9 @@ test("the install button is hidden in standalone mode", () => {
 
 test("manifest icons have correct dimensions and are present", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
+  assert.equal(manifest.start_url, "./");
+  assert.equal(manifest.scope, "./");
+  assert.equal(manifest.display, "standalone");
   for (const size of [192, 512]) {
     const icon = manifest.icons.find((entry) => entry.sizes === `${size}x${size}`);
     assert.ok(icon);
@@ -85,4 +137,11 @@ test("manifest icons have correct dimensions and are present", () => {
     assert.equal(data.readUInt32BE(16), size);
     assert.equal(data.readUInt32BE(20), size);
   }
+});
+
+test("install listener loads in the document head before page scripts", () => {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  assert.match(html, /<head>[\s\S]*<script src="install\.js"><\/script>[\s\S]*<\/head>/);
+  assert.equal((html.match(/<script src="install\.js"><\/script>/g) || []).length, 1);
+  assert.match(html, /<link rel="manifest" href="manifest\.json">/);
 });

@@ -102,7 +102,7 @@ test("push notification opens the date in the app and rejects external destinati
 test("installs scoped shell and removes only old app caches", async () => {
   const worker = createWorker();
   await worker.lifecycle("install");
-  const shell = worker.stores.get("nasa-space-explorer-shell-v3");
+  const shell = worker.stores.get("nasa-space-explorer-shell-v4");
   assert.ok(shell.has("https://example.test/project/index.html"));
   assert.ok(shell.has("https://example.test/project/manifest.json"));
   assert.ok(shell.has("https://example.test/project/install.js"));
