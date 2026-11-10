@@ -113,6 +113,11 @@ async function requestApod(params, direct) {
   const query = new URLSearchParams(params);
   if (direct) query.set("api_key", NASA_DEMO_KEY);
   const response = await fetch(`${direct ? NASA_APOD_URL : APOD_ENDPOINT}?${query}`);
+  if (response.status === 429) {
+    console.error("Rate limit exceeded. Try again later.");
+    return { response, data: null };
+  }
+
   let data;
   try {
     data = await response.json();
@@ -148,10 +153,15 @@ async function fetchLegacyApod(params) {
     ({ response, data } = await requestApod(params, true));
   }
 
-  if (!proxyUnavailable && data === null) {
+  if (!proxyUnavailable && data === null && response.status !== 429) {
     // No JSON from /api/apod: fall back to NASA's public DEMO_KEY
     proxyUnavailable = true;
     ({ response, data } = await requestApod(params, true));
+  }
+  if (response.status === 429) {
+    const error = new Error("Rate limit exceeded. Try again later.");
+    error.status = response.status;
+    throw error;
   }
   if (data === null) {
     throw new Error("NASA returned an unreadable response.");

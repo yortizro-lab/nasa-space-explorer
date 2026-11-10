@@ -52,9 +52,10 @@ function entries(start, end) {
   return result;
 }
 
-async function setup(navigator) {
+async function setup(navigator, hostname = "example.github.io") {
   const elements = new Map();
   const calls = [];
+  const errors = [];
   let handler = (params) => ({ status: 200, data: entries(params.start_date, params.end_date) });
   const document = {
     getElementById(id) {
@@ -66,23 +67,28 @@ async function setup(navigator) {
     body: new Element(),
   };
   const context = vm.createContext({
-    window: { location: { hostname: "example.github.io" } },
+    window: { location: { hostname } },
     document, navigator, HTMLElement: Element, DOMParser: TestDOMParser, URL, URLSearchParams, Date, Math, Set,
-    console: { error() {}, warn() {} },
+    console: { error(...args) { errors.push(args); }, warn() {} },
     async fetch(url) {
-      const parsed = new URL(url);
+      const parsed = new URL(url, `https://${hostname}`);
       const params = Object.fromEntries(parsed.searchParams);
+      params.requestHost = parsed.hostname;
       if (parsed.hostname === "science.nasa.gov") params.scienceDate = parsed.pathname.split("/").pop();
       calls.push(params);
       const result = await handler(params);
-      return { ok: result.status === 200, status: result.status, json: async () => result.data };
+      return { ok: result.status === 200, status: result.status, json: async () => {
+        if (result.onJson) result.onJson();
+        if (result.invalidJson) throw new SyntaxError("Invalid JSON");
+        return result.data;
+      } };
     },
   });
   vm.runInContext(script, context);
   await new Promise((resolve) => setImmediate(resolve));
   calls.length = 0;
   return {
-    elements, calls, context,
+    elements, calls, context, errors,
     setHandler(value) { handler = value; },
     load(start, focus = start) {
       return vm.runInContext(`loadDiscoveries(${JSON.stringify(start)}, ${JSON.stringify(focus)})`, context);
@@ -253,6 +259,44 @@ test("NASA Science displays nine discoveries when the APOD API is rate-limited o
   }
 });
 
+test("APOD helper logs rate limits and returns a null body without parsing it", async () => {
+  const app = await setup();
+  let parsed = false;
+  app.setHandler(() => ({ status: 429, onJson: () => { parsed = true; } }));
+  const result = await vm.runInContext('requestApod({ date: "2020-01-01" }, true)', app.context);
+  assert.equal(result.response.status, 429);
+  assert.equal(result.data, null);
+  assert.equal(parsed, false);
+  assert.equal(app.calls[0].api_key, "DEMO_KEY");
+  assert.equal(app.errors.at(-1)[0], "Rate limit exceeded. Try again later.");
+});
+
+test("a rate-limited direct retry retains the rate-limit error", async () => {
+  const app = await setup(undefined, "localhost");
+  app.setHandler((params) => params.requestHost === "localhost"
+    ? { status: 404, invalidJson: true }
+    : { status: 429 });
+  await assert.rejects(
+    vm.runInContext('fetchLegacyApod({ date: "2020-01-01" })', app.context),
+    (error) => error.status === 429 && /Rate limit exceeded/.test(error.message)
+  );
+  assert.deepEqual(app.calls.map((call) => call.requestHost), ["localhost", "api.nasa.gov"]);
+});
+
+test("a rate-limited proxy falls back to NASA Science without retrying with the demo key", async () => {
+  const app = await setup(undefined, "localhost");
+  app.setHandler((params) => {
+    if (!params.scienceDate) return { status: 429, invalidJson: true };
+    const date = `20${params.scienceDate.slice(0, 2)}-${params.scienceDate.slice(2, 4)}-${params.scienceDate.slice(4, 6)}`;
+    return { status: 200, data: { date, title: date, media_type: "image", hdurl: "https://example.com/image.jpg" } };
+  });
+  await app.load("2020-01-01");
+  assert.equal(app.elements.get("galleryContainer").children.length, 9);
+  assert.equal(app.calls.filter((call) => call.requestHost === "localhost").length, 1);
+  assert.equal(app.calls.some((call) => call.requestHost === "api.nasa.gov"), false);
+  assert.equal(app.errors.at(-1)[0], "Rate limit exceeded. Try again later.");
+});
+
 test("NASA Science is used when the APOD request fails at the network layer", async () => {
   const app = await setup();
   app.setHandler((params) => {
@@ -298,6 +342,7 @@ test("failure of both services is displayed instead of an empty gallery", async 
   await app.load("2020-01-01");
   assert.equal(app.elements.get("galleryContainer").children.length, 0);
   assert.match(app.elements.get("errorMessage").textContent, /Both NASA discovery services failed/);
+  assert.match(app.elements.get("errorMessage").textContent, /Rate limit exceeded/);
   assert.equal(app.elements.get("loadingMessage").textContent, "");
   assert.equal(app.elements.get("searchButton").disabled, false);
 });
